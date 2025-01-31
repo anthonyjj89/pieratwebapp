@@ -1,13 +1,12 @@
 import './globals.css';
 import { Inter } from 'next/font/google';
 import { NextAuthProvider } from '@/components/providers/NextAuthProvider';
-import { Metadata } from 'next';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = {
+export const metadata = {
   title: 'PieRat - Star Citizen Piracy Management',
-  description: 'Track and manage your Star Citizen piracy operations',
+  description: 'Track and manage piracy operations in Star Citizen',
 };
 
 export default function RootLayout({
@@ -16,8 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full bg-gray-900">
-      <body className={`${inter.className} h-full`}>
+    <html lang="en">
+      <body className={`${inter.className} antialiased`}>
         <NextAuthProvider>{children}</NextAuthProvider>
       </body>
     </html>
