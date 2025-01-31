@@ -1,27 +1,20 @@
 import NextAuth from 'next-auth';
 import DiscordProvider from 'next-auth/providers/discord';
-import { MongoDBAdapter } from '@auth/mongodb-adapter';
 import { MongoClient } from 'mongodb';
 
 const client = new MongoClient(process.env.MONGODB_URI!);
+const db = client.db(process.env.MONGODB_DB);
 
-interface DiscordProfile {
+// Define custom user type that includes discordId
+interface CustomUser {
   id: string;
-  username: string;
-  avatar: string;
+  discordId: string;
+  name: string;
   email: string;
-  verified: boolean;
-  guilds?: Array<{
-    id: string;
-    name: string;
-    icon: string;
-    owner: boolean;
-    permissions: number;
-  }>;
+  image?: string;
 }
 
 const handler = NextAuth({
-  adapter: MongoDBAdapter(client),
   providers: [
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
@@ -31,7 +24,7 @@ const handler = NextAuth({
           scope: 'identify email guilds'
         }
       },
-      profile(profile: DiscordProfile) {
+      profile(profile) {
         return {
           id: profile.id,
           discordId: profile.id,
@@ -45,13 +38,31 @@ const handler = NextAuth({
     })
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === 'discord') {
+        await client.connect();
+        await db.collection('users').updateOne(
+          { discordId: user.id },
+          {
+            $set: {
+              name: user.name,
+              email: user.email,
+              image: user.image,
+              updatedAt: new Date()
+            }
+          },
+          { upsert: true }
+        );
+      }
+      return true;
+    },
     async session({ session, user }) {
       return {
         ...session,
         user: {
           ...session.user,
           id: user.id,
-          discordId: user.discordId
+          discordId: user.id
         }
       };
     }
