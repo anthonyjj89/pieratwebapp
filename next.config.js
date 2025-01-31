@@ -1,18 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  images: {
-    domains: [
-      'cdn.discordapp.com',
-      'media.discordapp.net'
-    ],
+  experimental: {
+    appDir: true
   },
-  reactStrictMode: true,
-  poweredByHeader: false,
-  swcMinify: true,
-  env: {
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+  // Ensure images from Discord CDN work
+  images: {
+    domains: ['cdn.discordapp.com']
   }
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig
