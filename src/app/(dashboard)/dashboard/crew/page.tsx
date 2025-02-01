@@ -1,8 +1,3 @@
-export const metadata = {
-  title: 'Crew Management - PieRat',
-  description: 'Manage your organization crew members',
-};
-
 export default function CrewPage() {
   return (
     <div className="p-8">

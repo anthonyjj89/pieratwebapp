@@ -1,8 +1,3 @@
-export const metadata = {
-  title: 'Reports - PieRat',
-  description: 'View and manage hit reports',
-};
-
 export default function ReportsPage() {
   return (
     <div className="p-8">
