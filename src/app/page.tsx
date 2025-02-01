@@ -1,8 +1,6 @@
-'use client';
-
 import Link from 'next/link';
 
-export default function Home() {
+export default async function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-gray-900 to-black text-white">
       <div className="text-center space-y-6">
