@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import type { Organization, RSIProfile, ScrapeOptions, ErrorResponse } from './types';
 import { RSIError } from './types';
 
-export class RSIScraper {
+class RSIScraper {
     private baseUrl: string;
     private headers: Record<string, string>;
     private options: Required<ScrapeOptions>;
@@ -116,8 +116,12 @@ export class RSIScraper {
 
             // Process affiliated organizations
             const affiliatedOrgs: Organization[] = [];
-            org$('.box-content.org.affiliation').each((_i: number, element: any) => {
-                const isRedacted = org$(element).hasClass('visibility-R');
+            const normalizeUrl = this.normalizeUrl.bind(this);
+            const baseUrl = this.baseUrl;
+            
+            org$('.box-content.org.affiliation').each((_, element) => {
+                const $el = org$(element);
+                const isRedacted = $el.hasClass('visibility-R');
                 
                 if (isRedacted) {
                     affiliatedOrgs.push({
@@ -131,20 +135,20 @@ export class RSIScraper {
                         stars: 0
                     });
                 } else {
-                    const orgLink = org$(element).find('.info a').first();
+                    const orgLink = $el.find('.info a').first();
                     const orgName = orgLink.text().trim();
                     const orgHref = orgLink.attr('href');
                     const orgSID = orgHref ? orgHref.split('/')[2] : null;
-                    const orgRank = org$(element).find('.info .value:contains("rank")').text().trim() || 'N/A';
-                    const memberCount = org$(element).find('.thumb .members').text().trim().split(' ')[0] || 'Unknown';
-                    const logoUrl = this.normalizeUrl(org$(element).find('.thumb img').attr('src'));
+                    const orgRank = $el.find('.info .value:contains("rank")').text().trim() || 'N/A';
+                    const memberCount = $el.find('.thumb .members').text().trim().split(' ')[0] || 'Unknown';
+                    const logoUrl = normalizeUrl($el.find('.thumb img').attr('src'));
 
                     affiliatedOrgs.push({
                         name: orgName,
                         sid: orgSID || 'UNKNOWN',
                         rank: orgRank,
                         memberCount,
-                        url: orgSID ? `${this.baseUrl}/orgs/${orgSID}` : null,
+                        url: orgSID ? `${baseUrl}/orgs/${orgSID}` : null,
                         logoUrl,
                         isRedacted: false,
                         stars: 0
@@ -188,6 +192,7 @@ export class RSIScraper {
     }
 }
 
+// Create a singleton instance
 const scraper = new RSIScraper();
-export { RSIScraper };
-export default scraper;
+export type { RSIScraper };  // Export type only
+export default scraper;      // Export instance as default

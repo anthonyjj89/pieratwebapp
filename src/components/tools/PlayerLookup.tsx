@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { RSIProfile } from '@/services/rsi/types';
 import scraper from '@/services/rsi/scraper';
@@ -34,7 +36,7 @@ export default function PlayerLookup({ onResult }: Props) {
         <div className="w-full max-w-md">
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label htmlFor="handle" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="handle" className="block text-sm font-medium text-gray-200">
                         Player Handle
                     </label>
                     <input
@@ -42,14 +44,14 @@ export default function PlayerLookup({ onResult }: Props) {
                         id="handle"
                         value={handle}
                         onChange={(e) => setHandle(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        className="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                         placeholder="Enter RSI handle"
                         disabled={loading}
                     />
                 </div>
 
                 {error && (
-                    <div className="text-red-600 text-sm">
+                    <div className="text-red-500 text-sm">
                         {error}
                     </div>
                 )}

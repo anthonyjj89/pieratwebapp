@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import type { TradeCommodity, TradeLocation, PriceData, ScrapeOptions, ErrorResponse } from './types';
 import { TradeError, createPriceEntry } from './types';
 
-export class TradeScraper {
+class TradeScraper {
     private baseUrl: string;
     private headers: Record<string, string>;
     private options: Required<ScrapeOptions>;
@@ -180,6 +180,7 @@ export class TradeScraper {
     }
 }
 
+// Create a singleton instance
 const scraper = new TradeScraper();
-export { TradeScraper };
-export default scraper;
+export type { TradeScraper };  // Export type only
+export default scraper;      // Export instance as default

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import scraper from '@/services/trade/scraper';
 import type { PriceData, TradeCommodity } from '@/services/trade/types';
