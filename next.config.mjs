@@ -1,16 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  images: {
-    domains: ['cdn.discordapp.com'],
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/',
-        destination: '/home',
-      },
-    ];
-  },
-};
+const nextConfig = {};
 
 export default nextConfig;
