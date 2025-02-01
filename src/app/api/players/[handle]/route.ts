@@ -1,9 +1,11 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { RSIScraper } from '@/services/rsi/scraper';
 import type { RSIError } from '@/services/rsi/types';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
-  _request: NextRequest,
+  request: Request,
   { params }: { params: { handle: string } }
 ) {
   try {
