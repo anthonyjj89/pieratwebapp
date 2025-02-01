@@ -1,21 +1,25 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { TradeScraper } from '@/services/trade/scraper';
 import type { TradeError } from '@/services/trade/types';
+
+type Props = {
+  params: { code: string }
+}
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { code: string } }
+  request: NextRequest,
+  props: Props
 ) {
   try {
-    const location = await TradeScraper.getLocationPrices(params.code);
+    const location = await TradeScraper.getLocationPrices(props.params.code);
 
     // Add query parameters to filter prices
-    const url = new URL(request.url);
-    const minPrice = url.searchParams.get('minPrice');
-    const maxPrice = url.searchParams.get('maxPrice');
-    const type = url.searchParams.get('type');
+    const searchParams = request.nextUrl.searchParams;
+    const minPrice = searchParams.get('minPrice');
+    const maxPrice = searchParams.get('maxPrice');
+    const type = searchParams.get('type');
 
     if (minPrice || maxPrice || type) {
       const min = minPrice ? parseFloat(minPrice) : 0;

@@ -1,15 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { RSIScraper } from '@/services/rsi/scraper';
 import type { RSIError } from '@/services/rsi/types';
+
+type Props = {
+  params: { handle: string }
+}
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { handle: string } }
+  request: NextRequest,
+  props: Props
 ) {
   try {
-    const profile = await RSIScraper.getProfileData(params.handle);
+    const profile = await RSIScraper.getProfileData(props.params.handle);
     
     // If the profile has an organization, fetch its details
     if (profile.organizations?.main) {
