@@ -4,6 +4,7 @@ import { Session } from 'next-auth';
 import { Account } from 'next-auth';
 
 export const authOptions = {
+  debug: true,
   providers: [
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
