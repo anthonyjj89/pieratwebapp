@@ -6,8 +6,7 @@ export interface Organization {
     url: string | null;
     logoUrl: string | null;
     isRedacted: boolean;
-    stars?: number; // Optional star rating
-    logo?: string; // Legacy logo field for compatibility
+    stars: number;
 }
 
 export interface RSIProfile {
@@ -18,7 +17,7 @@ export interface RSIProfile {
     avatarUrl: string | null;
     mainOrg: Organization | null;
     affiliatedOrgs: Organization[];
-    organizations?: { // Optional organizations field for API compatibility
+    organizations: {
         main: Organization | null;
         affiliated: Organization[];
     };
@@ -28,7 +27,7 @@ export interface ScrapeOptions {
     timeout?: number;
     retries?: number;
     retryDelay?: number;
-    cacheTime?: number; // Cache duration in milliseconds
+    cacheTime?: number;
 }
 
 export type ErrorResponse = {
@@ -44,31 +43,30 @@ export type ErrorResponse = {
         };
     };
     isAxiosError?: boolean;
-    username?: string;
 };
 
 export class RSIError extends Error {
     code?: number;
     details?: string;
+    statusCode?: number;
+    username?: string;
 
-    constructor(message: string, public username?: string) {
+    constructor(message: string, username?: string) {
         super(message);
         this.name = 'RSIError';
+        this.username = username;
     }
 
     static fromResponse(error: ErrorResponse): RSIError {
-        const rsiError = new RSIError(error.message || 'Unknown error', error.username);
-        
-        // Handle status codes
+        const rsiError = new RSIError(error.message || 'Unknown error');
         if (error.response?.status) {
             rsiError.code = error.response.status;
+            rsiError.statusCode = error.response.status;
         } else if (error.code === 'ECONNABORTED') {
             rsiError.code = 408; // Request Timeout
+            rsiError.statusCode = 408;
         }
-
-        // Handle error details
         rsiError.details = error.details || error.response?.data?.details || error.response?.data?.message;
-
         return rsiError;
     }
 }

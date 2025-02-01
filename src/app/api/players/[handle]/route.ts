@@ -1,13 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/rsi/scraper';
 import { RSIError } from '@/services/rsi/types';
 
 export async function GET(
-    request: Request,
-    { params }: { params: { handle: string } }
+    request: NextRequest,
+    context: { params: { handle: string } }
 ) {
     try {
-        const handle = params.handle;
+        const handle = context.params.handle;
         if (!handle) {
             return NextResponse.json({ error: 'Handle is required' }, { status: 400 });
         }
@@ -24,7 +24,7 @@ export async function GET(
             if (error.message === 'Profile not found') {
                 return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
             }
-            return NextResponse.json({ error: error.message }, { status: error.code || 500 });
+            return NextResponse.json({ error: error.message }, { status: error.statusCode || 500 });
         }
 
         return NextResponse.json(

@@ -1,13 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
 import { TradeError } from '@/services/trade/types';
 
 export async function GET(
-    request: Request,
-    { params }: { params: { code: string } }
+    request: NextRequest,
+    context: { params: { code: string } }
 ) {
     try {
-        const code = params.code;
+        const code = context.params.code;
         if (!code) {
             return NextResponse.json({ error: 'Location code is required' }, { status: 400 });
         }
