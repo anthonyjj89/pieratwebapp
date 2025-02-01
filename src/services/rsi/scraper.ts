@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import type { ProfileData, Organization, RSIError, ScrapeOptions } from './types';
+import { RSIError } from './types';
+import type { RSIProfile, Organization, ScrapeOptions } from './types';
 
 const BASE_URL = 'https://robertsspaceindustries.com';
 const DEFAULT_OPTIONS: ScrapeOptions = {
@@ -10,7 +11,7 @@ const DEFAULT_OPTIONS: ScrapeOptions = {
 };
 
 export class RSIScraper {
-  private static cache = new Map<string, { data: ProfileData | Organization; timestamp: number }>();
+  private static cache = new Map<string, { data: RSIProfile | Organization; timestamp: number }>();
 
   private static async fetchWithRetry(url: string, options: ScrapeOptions = DEFAULT_OPTIONS): Promise<string> {
     let lastError: Error | null = null;
@@ -37,7 +38,7 @@ export class RSIScraper {
     return `${type}:${id}`;
   }
 
-  private static getFromCache<T extends ProfileData | Organization>(key: string): T | null {
+  private static getFromCache<T extends RSIProfile | Organization>(key: string): T | null {
     const cached = this.cache.get(key);
     if (!cached) return null;
 
@@ -50,29 +51,30 @@ export class RSIScraper {
     return cached.data as T;
   }
 
-  private static setCache<T extends ProfileData | Organization>(key: string, data: T): void {
+  private static setCache<T extends RSIProfile | Organization>(key: string, data: T): void {
     this.cache.set(key, {
       data,
       timestamp: Date.now()
     });
   }
 
-  static async getProfileData(handle: string): Promise<ProfileData> {
+  static async getProfileData(handle: string): Promise<RSIProfile> {
     const cacheKey = this.getCacheKey('profile', handle);
-    const cached = this.getFromCache<ProfileData>(cacheKey);
+    const cached = this.getFromCache<RSIProfile>(cacheKey);
     if (cached) return cached;
 
     try {
       const html = await this.fetchWithRetry(`${BASE_URL}/citizens/${handle}`);
       const $ = cheerio.load(html);
 
-      const profile: ProfileData = {
+      const profile: RSIProfile = {
         handle,
-        displayName: $('.profile-content .info .value').first().text().trim(),
+        signupDate: $('.profile-content .info .value').first().text().trim(),
         enlisted: $('.profile-content .info .value').eq(1).text().trim(),
         location: $('.profile-wrapper .location .value').text().trim(),
-        avatarUrl: $('.profile .thumb img').attr('src'),
-        bio: $('.profile-content .bio').text().trim(),
+        avatarUrl: $('.profile .thumb img').attr('src') || null,
+        mainOrg: null,
+        affiliatedOrgs: [],
         organizations: {
           main: null,
           affiliated: []
@@ -82,23 +84,35 @@ export class RSIScraper {
       // Parse organizations
       const mainOrg = $('.main-org');
       if (mainOrg.length) {
-        profile.organizations!.main = {
-          sid: mainOrg.find('.org-name a').attr('href')?.split('/').pop() || '',
+        const orgSid = mainOrg.find('.org-name a').attr('href')?.split('/').pop() || '';
+        profile.mainOrg = {
+          sid: orgSid,
           name: mainOrg.find('.org-name a').text().trim(),
           rank: mainOrg.find('.org-rank .value').text().trim(),
+          memberCount: mainOrg.find('.member-count').text().trim(),
+          url: orgSid ? `${BASE_URL}/orgs/${orgSid}` : null,
+          logoUrl: mainOrg.find('.org-logo img').attr('src') || null,
+          isRedacted: false,
           stars: mainOrg.find('.stars').children().length,
           logo: mainOrg.find('.org-logo img').attr('src')
         };
+        profile.organizations!.main = profile.mainOrg;
       }
 
       $('.affiliated-org').each((_, elem) => {
+        const orgSid = $(elem).find('.org-name a').attr('href')?.split('/').pop() || '';
         const org: Organization = {
-          sid: $(elem).find('.org-name a').attr('href')?.split('/').pop() || '',
+          sid: orgSid,
           name: $(elem).find('.org-name a').text().trim(),
           rank: $(elem).find('.org-rank .value').text().trim(),
+          memberCount: $(elem).find('.member-count').text().trim(),
+          url: orgSid ? `${BASE_URL}/orgs/${orgSid}` : null,
+          logoUrl: $(elem).find('.org-logo img').attr('src') || null,
+          isRedacted: false,
           stars: $(elem).find('.stars').children().length,
           logo: $(elem).find('.org-logo img').attr('src')
         };
+        profile.affiliatedOrgs.push(org);
         profile.organizations!.affiliated.push(org);
       });
 
@@ -106,12 +120,11 @@ export class RSIScraper {
       return profile;
 
     } catch (error) {
-      const rsiError: RSIError = {
+      throw RSIError.fromResponse({
         code: 'PROFILE_FETCH_ERROR',
         message: `Failed to fetch profile for ${handle}`,
         details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      };
-      throw rsiError;
+      });
     }
   }
 
@@ -127,8 +140,12 @@ export class RSIScraper {
       const org: Organization = {
         sid,
         name: $('.org-title').text().trim(),
-        logo: $('.org-logo img').attr('src'),
+        rank: 'N/A', // Organization page doesn't show rank
         memberCount: parseInt($('.members .value').text().trim(), 10),
+        url: `${BASE_URL}/orgs/${sid}`,
+        logoUrl: $('.org-logo img').attr('src') || null,
+        isRedacted: false,
+        logo: $('.org-logo img').attr('src'),
         recruiting: $('.recruiting .value').text().trim().toLowerCase() === 'yes',
         archetype: $('.archetype .value').text().trim(),
         commitment: $('.commitment .value').text().trim(),
@@ -143,12 +160,11 @@ export class RSIScraper {
       return org;
 
     } catch (error) {
-      const rsiError: RSIError = {
+      throw RSIError.fromResponse({
         code: 'ORG_FETCH_ERROR',
         message: `Failed to fetch organization ${sid}`,
         details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      };
-      throw rsiError;
+      });
     }
   }
 }

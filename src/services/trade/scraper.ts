@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import type { CommodityPrice, TradeLocation, PriceEntry, TradeError } from './types';
+import { TradeError } from './types';
+import type { CommodityPrice, TradeLocation, PriceEntry, PriceData } from './types';
 
 const BASE_URL = 'https://uexcorp.space';
 const DEFAULT_TIMEOUT = 10000;
@@ -46,6 +47,15 @@ export class TradeScraper {
     });
   }
 
+  private static parsePriceData($: cheerio.CheerioAPI, selector: string): PriceData {
+    return {
+      min: parseFloat($(selector + ' .min').text().trim()) || 0,
+      max: parseFloat($(selector + ' .max').text().trim()) || 0,
+      avg: parseFloat($(selector + ' .avg').text().trim()) || 0,
+      median: parseFloat($(selector + ' .median').text().trim()) || 0
+    };
+  }
+
   static async getCommodityPrices(code: string): Promise<CommodityPrice> {
     const cacheKey = this.getCacheKey('commodity', code);
     const cached = this.getFromCache<CommodityPrice>(cacheKey);
@@ -60,18 +70,8 @@ export class TradeScraper {
         code,
         type: $('.commodity-type').text().trim(),
         prices: {
-          sell: {
-            min: parseFloat($('.sell-price .min').text().trim()),
-            max: parseFloat($('.sell-price .max').text().trim()),
-            avg: parseFloat($('.sell-price .avg').text().trim()),
-            median: parseFloat($('.sell-price .median').text().trim())
-          },
-          buy: {
-            min: parseFloat($('.buy-price .min').text().trim()),
-            max: parseFloat($('.buy-price .max').text().trim()),
-            avg: parseFloat($('.buy-price .avg').text().trim()),
-            median: parseFloat($('.buy-price .median').text().trim())
-          }
+          sell: this.parsePriceData($, '.sell-price'),
+          buy: this.parsePriceData($, '.buy-price')
         },
         updatedAt: new Date().toISOString()
       };
@@ -80,12 +80,11 @@ export class TradeScraper {
       return commodity;
 
     } catch (error) {
-      const tradeError: TradeError = {
+      throw TradeError.fromResponse({
         code: 'COMMODITY_FETCH_ERROR',
         message: `Failed to fetch commodity ${code}`,
         details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      };
-      throw tradeError;
+      });
     }
   }
 
@@ -113,9 +112,9 @@ export class TradeScraper {
       $('.buy-prices tr').each((_, elem) => {
         const entry: PriceEntry = {
           commodity: $(elem).find('.commodity-name').text().trim(),
-          price: parseFloat($(elem).find('.price').text().trim()),
+          price: parseFloat($(elem).find('.price').text().trim()) || 0,
           timestamp: new Date().toISOString(),
-          supply: parseInt($(elem).find('.supply').text().trim(), 10)
+          supply: parseInt($(elem).find('.supply').text().trim(), 10) || 0
         };
         location.prices.buy.push(entry);
       });
@@ -124,9 +123,9 @@ export class TradeScraper {
       $('.sell-prices tr').each((_, elem) => {
         const entry: PriceEntry = {
           commodity: $(elem).find('.commodity-name').text().trim(),
-          price: parseFloat($(elem).find('.price').text().trim()),
+          price: parseFloat($(elem).find('.price').text().trim()) || 0,
           timestamp: new Date().toISOString(),
-          demand: parseInt($(elem).find('.demand').text().trim(), 10)
+          demand: parseInt($(elem).find('.demand').text().trim(), 10) || 0
         };
         location.prices.sell.push(entry);
       });
@@ -135,12 +134,11 @@ export class TradeScraper {
       return location;
 
     } catch (error) {
-      const tradeError: TradeError = {
+      throw TradeError.fromResponse({
         code: 'LOCATION_FETCH_ERROR',
         message: `Failed to fetch location ${code}`,
         details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      };
-      throw tradeError;
+      });
     }
   }
 }

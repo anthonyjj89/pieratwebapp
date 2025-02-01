@@ -1,55 +1,90 @@
+export interface RSIProfile {
+  handle: string;
+  signupDate: string;
+  enlisted: string;
+  location: string;
+  avatarUrl: string | null;
+  mainOrg: Organization | null;
+  affiliatedOrgs: Organization[];
+  organizations?: {
+    main: Organization | null;
+    affiliated: Organization[];
+  };
+}
+
 export interface Organization {
-  sid: string;
   name: string;
-  logo?: string;
-  rank?: string;
+  sid: string;
+  rank: string;
+  memberCount: string | number;
+  url: string | null;
+  logoUrl: string | null;
+  isRedacted: boolean;
   stars?: number;
-  memberCount?: number;
+  logo?: string;
   recruiting?: boolean;
   archetype?: string;
   commitment?: string;
   roleplay?: boolean;
   primaryFocus?: string;
-  primaryImage?: string;
   secondaryFocus?: string;
+  primaryImage?: string;
   secondaryImage?: string;
+  banner?: string;
 }
 
-export interface ProfileData {
-  handle: string;
-  displayName?: string;
-  title?: string;
-  bio?: string;
-  enlisted?: string;
-  location?: string;
-  languages?: string[];
-  avatarUrl?: string;
-  badges?: string[];
-  organizations?: {
-    main: Organization | null;
-    affiliated: Organization[];
-  };
-  // Additional fields that might be useful
-  lastSeen?: string;
-  website?: string;
-  discord?: string;
+export interface ScraperConfig {
+  baseUrl: string;
+  timeout: number;
+  retries: number;
+  retryDelay: number;
 }
 
-export interface RSIError {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-}
-
-// Additional type definitions for scraping
-export interface ScrapeOptions {
+export interface RequestOptions {
+  method?: string;
+  headers?: Record<string, string>;
   timeout?: number;
+  data?: unknown;
+}
+
+export interface ScrapeOptions {
   retries?: number;
+  timeout?: number;
   cacheTime?: number;
 }
 
-export interface ScrapedPage {
-  url: string;
-  html: string;
-  timestamp: string;
+export interface RSIErrorResponse {
+  code: string;
+  message: string;
+  details: RSIErrorDetails;
 }
+
+export interface RSIErrorDetails {
+  error: string;
+}
+
+export class RSIError extends Error {
+  constructor(
+    message: string,
+    public username?: string,
+    public statusCode?: number,
+    public code?: string | RSIErrorDetails,
+    public details?: string | RSIErrorDetails
+  ) {
+    super(message);
+    this.name = 'RSIError';
+  }
+
+  static fromResponse(response: RSIErrorResponse): RSIError {
+    return new RSIError(
+      response.message,
+      undefined,
+      undefined,
+      response.code,
+      response.details
+    );
+  }
+}
+
+// Alias for backward compatibility
+export type ProfileData = RSIProfile;
