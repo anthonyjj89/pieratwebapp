@@ -1,14 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { TradeScraper } from '@/services/trade/scraper';
 import type { TradeError } from '@/services/trade/types';
 
 export async function GET(
-  request: Request,
-  context: { params: { code: string } }
+  _request: NextRequest,
+  { params }: { params: { code: string } }
 ) {
-  const { code } = context.params;
   try {
-    const commodity = await TradeScraper.getCommodityPrices(code);
+    const commodity = await TradeScraper.getCommodityPrices(params.code);
     return NextResponse.json(commodity);
   } catch (error) {
     const tradeError = error as TradeError;

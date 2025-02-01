@@ -1,14 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { RSIScraper } from '@/services/rsi/scraper';
 import type { RSIError } from '@/services/rsi/types';
 
 export async function GET(
-  request: Request,
-  context: { params: { handle: string } }
+  _request: NextRequest,
+  { params }: { params: { handle: string } }
 ) {
-  const { handle } = context.params;
   try {
-    const profile = await RSIScraper.getProfileData(handle);
+    const profile = await RSIScraper.getProfileData(params.handle);
     
     // If the profile has an organization, fetch its details
     if (profile.organizations?.main) {
