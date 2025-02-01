@@ -4,10 +4,11 @@ import type { TradeError } from '@/services/trade/types';
 
 export async function GET(
   request: Request,
-  { params }: { params: { code: string } }
+  context: { params: { code: string } }
 ) {
+  const { code } = context.params;
   try {
-    const location = await TradeScraper.getLocationPrices(params.code);
+    const location = await TradeScraper.getLocationPrices(code);
 
     // Add query parameters to filter prices
     const { searchParams } = new URL(request.url);

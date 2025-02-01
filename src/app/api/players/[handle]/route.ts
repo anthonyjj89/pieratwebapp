@@ -4,10 +4,11 @@ import type { RSIError } from '@/services/rsi/types';
 
 export async function GET(
   request: Request,
-  { params }: { params: { handle: string } }
+  context: { params: { handle: string } }
 ) {
+  const { handle } = context.params;
   try {
-    const profile = await RSIScraper.getProfileData(params.handle);
+    const profile = await RSIScraper.getProfileData(handle);
     
     // If the profile has an organization, fetch its details
     if (profile.organizations?.main) {

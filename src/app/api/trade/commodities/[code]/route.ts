@@ -4,10 +4,11 @@ import type { TradeError } from '@/services/trade/types';
 
 export async function GET(
   request: Request,
-  { params }: { params: { code: string } }
+  context: { params: { code: string } }
 ) {
+  const { code } = context.params;
   try {
-    const commodity = await TradeScraper.getCommodityPrices(params.code);
+    const commodity = await TradeScraper.getCommodityPrices(code);
     return NextResponse.json(commodity);
   } catch (error) {
     const tradeError = error as TradeError;
