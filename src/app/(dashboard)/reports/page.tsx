@@ -1,19 +1,20 @@
-import { PlayerLookup } from '@/components/tools/PlayerLookup';
+import PlayerLookup from '@/components/tools/PlayerLookup';
+import { RSIProfile } from '@/services/rsi/types';
 
 export default function ReportsPage() {
-  return (
-    <div className="container mx-auto p-4">
-      <h1 className="mb-6 text-2xl font-bold text-white">Reports</h1>
-      
-      <div className="mb-8">
-        <h2 className="mb-4 text-xl font-semibold text-white">Player Lookup</h2>
-        <PlayerLookup />
-      </div>
+    const handlePlayerResult = (profile: RSIProfile) => {
+        console.log('Player profile:', profile);
+        // TODO: Handle player lookup result
+    };
 
-      <div className="rounded-lg bg-slate-800/50 p-4 backdrop-blur">
-        <h2 className="mb-4 text-xl font-semibold text-white">Recent Reports</h2>
-        <p className="text-slate-400">No reports yet. Create a new report to get started.</p>
-      </div>
-    </div>
-  );
+    return (
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-2xl font-bold mb-8">Reports</h1>
+            
+            <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-xl font-semibold mb-4">Player Lookup</h2>
+                <PlayerLookup onResult={handlePlayerResult} />
+            </div>
+        </div>
+    );
 }

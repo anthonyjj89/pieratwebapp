@@ -1,19 +1,20 @@
-import { TradeTool } from '@/components/tools/TradeTool';
+import TradeTool from '@/components/tools/TradeTool';
+import type { PriceData } from '@/services/trade/types';
 
 export default function AnalyticsPage() {
-  return (
-    <div className="container mx-auto p-4">
-      <h1 className="mb-6 text-2xl font-bold text-white">Analytics</h1>
-      
-      <div className="mb-8">
-        <h2 className="mb-4 text-xl font-semibold text-white">Trade Data</h2>
-        <TradeTool />
-      </div>
+    const handleTradeResult = (data: PriceData) => {
+        console.log('Trade data:', data);
+        // TODO: Add analytics visualization
+    };
 
-      <div className="rounded-lg bg-slate-800/50 p-4 backdrop-blur">
-        <h2 className="mb-4 text-xl font-semibold text-white">Trade History</h2>
-        <p className="text-slate-400">No trade history available yet.</p>
-      </div>
-    </div>
-  );
+    return (
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-2xl font-bold mb-8 text-white">Trade Analytics</h1>
+            
+            <div className="bg-black/30 backdrop-blur-lg shadow rounded-lg p-6">
+                <h2 className="text-xl font-semibold mb-4 text-white">Trade Data</h2>
+                <TradeTool onResult={handleTradeResult} />
+            </div>
+        </div>
+    );
 }

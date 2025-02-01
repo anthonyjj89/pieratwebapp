@@ -1,122 +1,67 @@
-"use client";
-
 import { useState } from 'react';
-import { RSIScraper } from '@/services/rsi/scraper';
-import type { RSIProfile } from '@/services/rsi/types';
+import { RSIProfile } from '@/services/rsi/types';
+import scraper from '@/services/rsi/scraper';
 
-export function PlayerLookup() {
-  const [handle, setHandle] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<RSIProfile | null>(null);
+interface Props {
+    onResult?: (profile: RSIProfile) => void;
+}
 
-  const handleSearch = async () => {
-    if (!handle) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await RSIScraper.getProfileData(handle);
-      setProfile(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch player data');
-      setProfile(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+export default function PlayerLookup({ onResult }: Props) {
+    const [handle, setHandle] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={handle}
-          onChange={(e) => setHandle(e.target.value)}
-          placeholder="Enter player handle..."
-          className="flex-1 rounded-lg bg-slate-800/50 px-4 py-2 text-white placeholder-slate-400 backdrop-blur"
-        />
-        <button
-          onClick={handleSearch}
-          disabled={loading || !handle}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {loading ? 'Searching...' : 'Search'}
-        </button>
-      </div>
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!handle) return;
 
-      {error && (
-        <div className="rounded-lg bg-red-500/10 p-4 text-red-500">
-          {error}
-        </div>
-      )}
+        setLoading(true);
+        setError(null);
 
-      {profile && (
-        <div className="space-y-4 rounded-lg bg-slate-800/50 p-4 backdrop-blur">
-          <div className="flex items-start gap-4">
-            {profile.avatarUrl && (
-              <img
-                src={profile.avatarUrl}
-                alt={profile.handle}
-                className="h-20 w-20 rounded-lg"
-              />
-            )}
-            <div>
-              <h3 className="text-xl font-bold text-white">{profile.handle}</h3>
-              <p className="text-slate-400">Enlisted: {profile.enlisted}</p>
-              <p className="text-slate-400">Location: {profile.location}</p>
-            </div>
-          </div>
+        try {
+            const profile = await scraper.getProfileData(handle);
+            if (onResult) {
+                onResult(profile);
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to fetch player data');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-          {profile.mainOrg && !profile.mainOrg.isRedacted && (
-            <div className="border-t border-slate-700 pt-4">
-              <h4 className="mb-2 font-bold text-white">Main Organization</h4>
-              <div className="flex items-center gap-4">
-                {profile.mainOrg.logoUrl && (
-                  <img
-                    src={profile.mainOrg.logoUrl}
-                    alt={profile.mainOrg.name}
-                    className="h-12 w-12 rounded"
-                  />
-                )}
+    return (
+        <div className="w-full max-w-md">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <p className="font-medium text-white">{profile.mainOrg.name}</p>
-                  <p className="text-sm text-slate-400">
-                    Rank: {profile.mainOrg.rank}
-                  </p>
+                    <label htmlFor="handle" className="block text-sm font-medium text-gray-700">
+                        Player Handle
+                    </label>
+                    <input
+                        type="text"
+                        id="handle"
+                        value={handle}
+                        onChange={(e) => setHandle(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="Enter RSI handle"
+                        disabled={loading}
+                    />
                 </div>
-              </div>
-            </div>
-          )}
 
-          {profile.affiliatedOrgs.length > 0 && (
-            <div className="border-t border-slate-700 pt-4">
-              <h4 className="mb-2 font-bold text-white">Affiliated Organizations</h4>
-              <div className="space-y-2">
-                {profile.affiliatedOrgs.map((org) => (
-                  !org.isRedacted && (
-                    <div key={org.sid} className="flex items-center gap-4">
-                      {org.logoUrl && (
-                        <img
-                          src={org.logoUrl}
-                          alt={org.name}
-                          className="h-8 w-8 rounded"
-                        />
-                      )}
-                      <div>
-                        <p className="font-medium text-white">{org.name}</p>
-                        <p className="text-sm text-slate-400">
-                          Rank: {org.rank}
-                        </p>
-                      </div>
+                {error && (
+                    <div className="text-red-600 text-sm">
+                        {error}
                     </div>
-                  )
-                ))}
-              </div>
-            </div>
-          )}
+                )}
+
+                <button
+                    type="submit"
+                    disabled={loading || !handle}
+                    className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    {loading ? 'Loading...' : 'Lookup Player'}
+                </button>
+            </form>
         </div>
-      )}
-    </div>
-  );
+    );
 }

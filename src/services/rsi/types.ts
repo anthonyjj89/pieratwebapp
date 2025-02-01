@@ -1,90 +1,74 @@
-export interface RSIProfile {
-  handle: string;
-  signupDate: string;
-  enlisted: string;
-  location: string;
-  avatarUrl: string | null;
-  mainOrg: Organization | null;
-  affiliatedOrgs: Organization[];
-  organizations?: {
-    main: Organization | null;
-    affiliated: Organization[];
-  };
-}
-
 export interface Organization {
-  name: string;
-  sid: string;
-  rank: string;
-  memberCount: string | number;
-  url: string | null;
-  logoUrl: string | null;
-  isRedacted: boolean;
-  stars?: number;
-  logo?: string;
-  recruiting?: boolean;
-  archetype?: string;
-  commitment?: string;
-  roleplay?: boolean;
-  primaryFocus?: string;
-  secondaryFocus?: string;
-  primaryImage?: string;
-  secondaryImage?: string;
-  banner?: string;
+    name: string;
+    sid: string;
+    rank: string;
+    memberCount: string;
+    url: string | null;
+    logoUrl: string | null;
+    isRedacted: boolean;
+    stars?: number; // Optional star rating
+    logo?: string; // Legacy logo field for compatibility
 }
 
-export interface ScraperConfig {
-  baseUrl: string;
-  timeout: number;
-  retries: number;
-  retryDelay: number;
-}
-
-export interface RequestOptions {
-  method?: string;
-  headers?: Record<string, string>;
-  timeout?: number;
-  data?: unknown;
+export interface RSIProfile {
+    handle: string;
+    signupDate: string;
+    enlisted: string;
+    location: string;
+    avatarUrl: string | null;
+    mainOrg: Organization | null;
+    affiliatedOrgs: Organization[];
+    organizations?: { // Optional organizations field for API compatibility
+        main: Organization | null;
+        affiliated: Organization[];
+    };
 }
 
 export interface ScrapeOptions {
-  retries?: number;
-  timeout?: number;
-  cacheTime?: number;
+    timeout?: number;
+    retries?: number;
+    retryDelay?: number;
+    cacheTime?: number; // Cache duration in milliseconds
 }
 
-export interface RSIErrorResponse {
-  code: string;
-  message: string;
-  details: RSIErrorDetails;
-}
-
-export interface RSIErrorDetails {
-  error: string;
-}
+export type ErrorResponse = {
+    message?: string;
+    code?: string;
+    details?: string;
+    response?: {
+        status?: number;
+        data?: {
+            message?: string;
+            code?: string;
+            details?: string;
+        };
+    };
+    isAxiosError?: boolean;
+    username?: string;
+};
 
 export class RSIError extends Error {
-  constructor(
-    message: string,
-    public username?: string,
-    public statusCode?: number,
-    public code?: string | RSIErrorDetails,
-    public details?: string | RSIErrorDetails
-  ) {
-    super(message);
-    this.name = 'RSIError';
-  }
+    code?: number;
+    details?: string;
 
-  static fromResponse(response: RSIErrorResponse): RSIError {
-    return new RSIError(
-      response.message,
-      undefined,
-      undefined,
-      response.code,
-      response.details
-    );
-  }
+    constructor(message: string, public username?: string) {
+        super(message);
+        this.name = 'RSIError';
+    }
+
+    static fromResponse(error: ErrorResponse): RSIError {
+        const rsiError = new RSIError(error.message || 'Unknown error', error.username);
+        
+        // Handle status codes
+        if (error.response?.status) {
+            rsiError.code = error.response.status;
+        } else if (error.code === 'ECONNABORTED') {
+            rsiError.code = 408; // Request Timeout
+        }
+
+        // Handle error details
+        rsiError.details = error.details || error.response?.data?.details || error.response?.data?.message;
+
+        return rsiError;
+    }
 }
-
-// Alias for backward compatibility
-export type ProfileData = RSIProfile;

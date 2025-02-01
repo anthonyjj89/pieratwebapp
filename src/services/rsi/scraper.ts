@@ -1,170 +1,193 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import type { Organization, RSIProfile, ScrapeOptions, ErrorResponse } from './types';
 import { RSIError } from './types';
-import type { RSIProfile, Organization, ScrapeOptions } from './types';
-
-const BASE_URL = 'https://robertsspaceindustries.com';
-const DEFAULT_OPTIONS: ScrapeOptions = {
-  timeout: 10000,
-  retries: 3,
-  cacheTime: 3600, // 1 hour
-};
 
 export class RSIScraper {
-  private static cache = new Map<string, { data: RSIProfile | Organization; timestamp: number }>();
+    private baseUrl: string;
+    private headers: Record<string, string>;
+    private options: Required<ScrapeOptions>;
 
-  private static async fetchWithRetry(url: string, options: ScrapeOptions = DEFAULT_OPTIONS): Promise<string> {
-    let lastError: Error | null = null;
-    
-    for (let i = 0; i < (options.retries || DEFAULT_OPTIONS.retries!); i++) {
-      try {
-        const response = await axios.get(url, {
-          timeout: options.timeout || DEFAULT_OPTIONS.timeout,
-          headers: {
+    constructor(options: ScrapeOptions = {}) {
+        this.baseUrl = 'https://robertsspaceindustries.com';
+        this.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
-        });
-        return response.data;
-      } catch (error) {
-        lastError = error as Error;
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-      }
+        };
+        this.options = {
+            timeout: options.timeout || 10000,
+            retries: options.retries || 3,
+            retryDelay: options.retryDelay || 1000,
+            cacheTime: options.cacheTime || 300000 // 5 minutes default
+        };
     }
 
-    throw new Error(`Failed to fetch ${url}: ${lastError?.message}`);
-  }
-
-  private static getCacheKey(type: string, id: string): string {
-    return `${type}:${id}`;
-  }
-
-  private static getFromCache<T extends RSIProfile | Organization>(key: string): T | null {
-    const cached = this.cache.get(key);
-    if (!cached) return null;
-
-    const now = Date.now();
-    if (now - cached.timestamp > (DEFAULT_OPTIONS.cacheTime! * 1000)) {
-      this.cache.delete(key);
-      return null;
+    private normalizeUrl(url: string | undefined): string | null {
+        if (!url) return null;
+        return url.startsWith('http') ? url : `${this.baseUrl}${url}`;
     }
 
-    return cached.data as T;
-  }
+    private async makeRequest(url: string): Promise<string> {
+        let retries = this.options.retries;
+        let lastError: ErrorResponse = { message: 'Unknown error' };
 
-  private static setCache<T extends RSIProfile | Organization>(key: string, data: T): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
-  }
-
-  static async getProfileData(handle: string): Promise<RSIProfile> {
-    const cacheKey = this.getCacheKey('profile', handle);
-    const cached = this.getFromCache<RSIProfile>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const html = await this.fetchWithRetry(`${BASE_URL}/citizens/${handle}`);
-      const $ = cheerio.load(html);
-
-      const profile: RSIProfile = {
-        handle,
-        signupDate: $('.profile-content .info .value').first().text().trim(),
-        enlisted: $('.profile-content .info .value').eq(1).text().trim(),
-        location: $('.profile-wrapper .location .value').text().trim(),
-        avatarUrl: $('.profile .thumb img').attr('src') || null,
-        mainOrg: null,
-        affiliatedOrgs: [],
-        organizations: {
-          main: null,
-          affiliated: []
+        while (retries > 0) {
+            try {
+                const response = await axios({
+                    url,
+                    headers: this.headers,
+                    timeout: this.options.timeout
+                });
+                return response.data;
+            } catch (error) {
+                lastError = error as ErrorResponse;
+                retries--;
+                if (retries === 0) break;
+                console.log(`Request failed, retrying... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
+            }
         }
-      };
 
-      // Parse organizations
-      const mainOrg = $('.main-org');
-      if (mainOrg.length) {
-        const orgSid = mainOrg.find('.org-name a').attr('href')?.split('/').pop() || '';
-        profile.mainOrg = {
-          sid: orgSid,
-          name: mainOrg.find('.org-name a').text().trim(),
-          rank: mainOrg.find('.org-rank .value').text().trim(),
-          memberCount: mainOrg.find('.member-count').text().trim(),
-          url: orgSid ? `${BASE_URL}/orgs/${orgSid}` : null,
-          logoUrl: mainOrg.find('.org-logo img').attr('src') || null,
-          isRedacted: false,
-          stars: mainOrg.find('.stars').children().length,
-          logo: mainOrg.find('.org-logo img').attr('src')
-        };
-        profile.organizations!.main = profile.mainOrg;
-      }
-
-      $('.affiliated-org').each((_, elem) => {
-        const orgSid = $(elem).find('.org-name a').attr('href')?.split('/').pop() || '';
-        const org: Organization = {
-          sid: orgSid,
-          name: $(elem).find('.org-name a').text().trim(),
-          rank: $(elem).find('.org-rank .value').text().trim(),
-          memberCount: $(elem).find('.member-count').text().trim(),
-          url: orgSid ? `${BASE_URL}/orgs/${orgSid}` : null,
-          logoUrl: $(elem).find('.org-logo img').attr('src') || null,
-          isRedacted: false,
-          stars: $(elem).find('.stars').children().length,
-          logo: $(elem).find('.org-logo img').attr('src')
-        };
-        profile.affiliatedOrgs.push(org);
-        profile.organizations!.affiliated.push(org);
-      });
-
-      this.setCache(cacheKey, profile);
-      return profile;
-
-    } catch (error) {
-      throw RSIError.fromResponse({
-        code: 'PROFILE_FETCH_ERROR',
-        message: `Failed to fetch profile for ${handle}`,
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      });
+        throw RSIError.fromResponse(lastError);
     }
-  }
 
-  static async getOrganizationData(sid: string): Promise<Organization> {
-    const cacheKey = this.getCacheKey('org', sid);
-    const cached = this.getFromCache<Organization>(cacheKey);
-    if (cached) return cached;
+    public async getProfileData(username: string): Promise<RSIProfile> {
+        try {
+            // Get profile data
+            console.log(`Fetching profile for ${username}...`);
+            const profileHtml = await this.makeRequest(`${this.baseUrl}/citizens/${username}`);
+            const $ = cheerio.load(profileHtml);
 
-    try {
-      const html = await this.fetchWithRetry(`${BASE_URL}/orgs/${sid}`);
-      const $ = cheerio.load(html);
+            // Check if profile exists
+            if ($('.not-found').length > 0) {
+                throw new RSIError('Profile not found', username);
+            }
 
-      const org: Organization = {
-        sid,
-        name: $('.org-title').text().trim(),
-        rank: 'N/A', // Organization page doesn't show rank
-        memberCount: parseInt($('.members .value').text().trim(), 10),
-        url: `${BASE_URL}/orgs/${sid}`,
-        logoUrl: $('.org-logo img').attr('src') || null,
-        isRedacted: false,
-        logo: $('.org-logo img').attr('src'),
-        recruiting: $('.recruiting .value').text().trim().toLowerCase() === 'yes',
-        archetype: $('.archetype .value').text().trim(),
-        commitment: $('.commitment .value').text().trim(),
-        roleplay: $('.roleplay .value').text().trim().toLowerCase() === 'yes',
-        primaryFocus: $('.primary-focus .focus-name').text().trim(),
-        primaryImage: $('.primary-focus .focus-image').attr('src'),
-        secondaryFocus: $('.secondary-focus .focus-name').text().trim(),
-        secondaryImage: $('.secondary-focus .focus-image').attr('src')
-      };
+            // Get basic profile info
+            const handle = $('.info .value').first().text().trim();
+            const signupDate = $('.info .entry:contains("Handle name") .value').text().trim();
+            const enlisted = $('.left-col .entry:contains("Enlisted") .value').text().trim();
+            const location = $('.left-col .entry:contains("Location") .value').text().trim();
+            const avatarUrl = this.normalizeUrl($('.profile .thumb img').attr('src'));
 
-      this.setCache(cacheKey, org);
-      return org;
+            // Get organizations data
+            console.log(`Fetching org data for ${username}...`);
+            const orgsHtml = await this.makeRequest(`${this.baseUrl}/citizens/${username}/organizations`);
+            const org$ = cheerio.load(orgsHtml);
+            
+            // Process main organization
+            const mainOrgElement = org$('.box-content.org.main');
+            let mainOrg: Organization | null = null;
 
-    } catch (error) {
-      throw RSIError.fromResponse({
-        code: 'ORG_FETCH_ERROR',
-        message: `Failed to fetch organization ${sid}`,
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      });
+            if (mainOrgElement.length > 0) {
+                const isRedacted = mainOrgElement.hasClass('visibility-R');
+                
+                if (isRedacted) {
+                    mainOrg = {
+                        name: 'REDACTED',
+                        sid: 'REDACTED',
+                        rank: 'REDACTED',
+                        memberCount: 'REDACTED',
+                        url: null,
+                        logoUrl: null,
+                        isRedacted: true,
+                        stars: 0
+                    };
+                } else {
+                    const orgLink = mainOrgElement.find('.info a').first();
+                    const orgName = orgLink.text().trim();
+                    const orgHref = orgLink.attr('href');
+                    const orgSID = orgHref ? orgHref.split('/')[2] : null;
+                    const orgRank = mainOrgElement.find('.info .value:contains("rank")').text().trim() || 'N/A';
+                    const memberCount = mainOrgElement.find('.thumb .members').text().trim().split(' ')[0] || 'Unknown';
+                    const logoUrl = this.normalizeUrl(mainOrgElement.find('.thumb img').attr('src'));
+
+                    mainOrg = {
+                        name: orgName,
+                        sid: orgSID || 'UNKNOWN',
+                        rank: orgRank,
+                        memberCount,
+                        url: orgSID ? `${this.baseUrl}/orgs/${orgSID}` : null,
+                        logoUrl,
+                        isRedacted: false,
+                        stars: 0
+                    };
+                }
+            }
+
+            // Process affiliated organizations
+            const affiliatedOrgs: Organization[] = [];
+            org$('.box-content.org.affiliation').each((_i: number, element: any) => {
+                const isRedacted = org$(element).hasClass('visibility-R');
+                
+                if (isRedacted) {
+                    affiliatedOrgs.push({
+                        name: 'REDACTED',
+                        sid: 'REDACTED',
+                        rank: 'REDACTED',
+                        memberCount: 'REDACTED',
+                        url: null,
+                        logoUrl: null,
+                        isRedacted: true,
+                        stars: 0
+                    });
+                } else {
+                    const orgLink = org$(element).find('.info a').first();
+                    const orgName = orgLink.text().trim();
+                    const orgHref = orgLink.attr('href');
+                    const orgSID = orgHref ? orgHref.split('/')[2] : null;
+                    const orgRank = org$(element).find('.info .value:contains("rank")').text().trim() || 'N/A';
+                    const memberCount = org$(element).find('.thumb .members').text().trim().split(' ')[0] || 'Unknown';
+                    const logoUrl = this.normalizeUrl(org$(element).find('.thumb img').attr('src'));
+
+                    affiliatedOrgs.push({
+                        name: orgName,
+                        sid: orgSID || 'UNKNOWN',
+                        rank: orgRank,
+                        memberCount,
+                        url: orgSID ? `${this.baseUrl}/orgs/${orgSID}` : null,
+                        logoUrl,
+                        isRedacted: false,
+                        stars: 0
+                    });
+                }
+            });
+
+            // Extract profile data
+            const data: RSIProfile = {
+                handle,
+                signupDate,
+                enlisted,
+                location,
+                avatarUrl,
+                mainOrg,
+                affiliatedOrgs,
+                organizations: {
+                    main: mainOrg,
+                    affiliated: affiliatedOrgs
+                }
+            };
+
+            console.log(`Successfully fetched data for ${username}`);
+            return data;
+
+        } catch (error) {
+            console.error(`Error fetching data for ${username}:`, error);
+            const err = error as ErrorResponse;
+            
+            if (err.response?.status === 404) {
+                throw new RSIError('Profile not found', username);
+            }
+            if (err.code === 'ECONNABORTED') {
+                throw new RSIError('Request timed out. The RSI website might be slow or down.');
+            }
+            if (err.response?.status === 429) {
+                throw new RSIError('Rate limited by RSI website. Please try again in a few minutes.');
+            }
+            throw RSIError.fromResponse(err);
+        }
     }
-  }
 }
+
+const scraper = new RSIScraper();
+export { RSIScraper };
+export default scraper;

@@ -1,144 +1,185 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { TradeError } from './types';
-import type { CommodityPrice, TradeLocation, PriceEntry, PriceData } from './types';
-
-const BASE_URL = 'https://uexcorp.space';
-const DEFAULT_TIMEOUT = 10000;
+import type { TradeCommodity, TradeLocation, PriceData, ScrapeOptions, ErrorResponse } from './types';
+import { TradeError, createPriceEntry } from './types';
 
 export class TradeScraper {
-  private static cache = new Map<string, { data: CommodityPrice | TradeLocation; timestamp: number }>();
-  private static cacheTime = 3600 * 1000; // 1 hour in milliseconds
+    private baseUrl: string;
+    private headers: Record<string, string>;
+    private options: Required<ScrapeOptions>;
 
-  private static async fetchWithTimeout(url: string): Promise<string> {
-    try {
-      const response = await axios.get(url, {
-        timeout: DEFAULT_TIMEOUT,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  private static getCacheKey(type: string, id: string): string {
-    return `${type}:${id}`;
-  }
-
-  private static getFromCache<T extends CommodityPrice | TradeLocation>(key: string): T | null {
-    const cached = this.cache.get(key);
-    if (!cached) return null;
-
-    if (Date.now() - cached.timestamp > this.cacheTime) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return cached.data as T;
-  }
-
-  private static setCache<T extends CommodityPrice | TradeLocation>(key: string, data: T): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
-  }
-
-  private static parsePriceData($: cheerio.CheerioAPI, selector: string): PriceData {
-    return {
-      min: parseFloat($(selector + ' .min').text().trim()) || 0,
-      max: parseFloat($(selector + ' .max').text().trim()) || 0,
-      avg: parseFloat($(selector + ' .avg').text().trim()) || 0,
-      median: parseFloat($(selector + ' .median').text().trim()) || 0
-    };
-  }
-
-  static async getCommodityPrices(code: string): Promise<CommodityPrice> {
-    const cacheKey = this.getCacheKey('commodity', code);
-    const cached = this.getFromCache<CommodityPrice>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const html = await this.fetchWithTimeout(`${BASE_URL}/trade/${code}`);
-      const $ = cheerio.load(html);
-
-      const commodity: CommodityPrice = {
-        name: $('.commodity-name').text().trim(),
-        code,
-        type: $('.commodity-type').text().trim(),
-        prices: {
-          sell: this.parsePriceData($, '.sell-price'),
-          buy: this.parsePriceData($, '.buy-price')
-        },
-        updatedAt: new Date().toISOString()
-      };
-
-      this.setCache(cacheKey, commodity);
-      return commodity;
-
-    } catch (error) {
-      throw TradeError.fromResponse({
-        code: 'COMMODITY_FETCH_ERROR',
-        message: `Failed to fetch commodity ${code}`,
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      });
-    }
-  }
-
-  static async getLocationPrices(code: string): Promise<TradeLocation> {
-    const cacheKey = this.getCacheKey('location', code);
-    const cached = this.getFromCache<TradeLocation>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const html = await this.fetchWithTimeout(`${BASE_URL}/location/${code}`);
-      const $ = cheerio.load(html);
-
-      const location: TradeLocation = {
-        name: $('.location-name').text().trim(),
-        code,
-        type: $('.location-type').text().trim() as 'STATION' | 'CITY' | 'OUTPOST',
-        system: $('.system-name').text().trim(),
-        prices: {
-          buy: [],
-          sell: []
-        }
-      };
-
-      // Parse buy prices
-      $('.buy-prices tr').each((_, elem) => {
-        const entry: PriceEntry = {
-          commodity: $(elem).find('.commodity-name').text().trim(),
-          price: parseFloat($(elem).find('.price').text().trim()) || 0,
-          timestamp: new Date().toISOString(),
-          supply: parseInt($(elem).find('.supply').text().trim(), 10) || 0
+    constructor(options: ScrapeOptions = {}) {
+        this.baseUrl = 'https://uexcorp.space';
+        this.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         };
-        location.prices.buy.push(entry);
-      });
-
-      // Parse sell prices
-      $('.sell-prices tr').each((_, elem) => {
-        const entry: PriceEntry = {
-          commodity: $(elem).find('.commodity-name').text().trim(),
-          price: parseFloat($(elem).find('.price').text().trim()) || 0,
-          timestamp: new Date().toISOString(),
-          demand: parseInt($(elem).find('.demand').text().trim(), 10) || 0
+        this.options = {
+            timeout: options.timeout || 10000,
+            retries: options.retries || 3,
+            retryDelay: options.retryDelay || 1000,
+            cacheTime: options.cacheTime || 300000 // 5 minutes default
         };
-        location.prices.sell.push(entry);
-      });
-
-      this.setCache(cacheKey, location);
-      return location;
-
-    } catch (error) {
-      throw TradeError.fromResponse({
-        code: 'LOCATION_FETCH_ERROR',
-        message: `Failed to fetch location ${code}`,
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
-      });
     }
-  }
+
+    private async makeRequest(url: string): Promise<string> {
+        let retries = this.options.retries;
+        let lastError: ErrorResponse = { message: 'Unknown error' };
+
+        while (retries > 0) {
+            try {
+                const response = await axios({
+                    url,
+                    headers: this.headers,
+                    timeout: this.options.timeout
+                });
+                return response.data;
+            } catch (error) {
+                lastError = error as ErrorResponse;
+                retries--;
+                if (retries === 0) break;
+                console.log(`Request failed, retrying... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
+            }
+        }
+
+        throw TradeError.fromResponse(lastError);
+    }
+
+    public async getCommodities(): Promise<TradeCommodity[]> {
+        try {
+            const html = await this.makeRequest(`${this.baseUrl}/commodities`);
+            const $ = cheerio.load(html);
+            
+            const commodities: TradeCommodity[] = [];
+            $('.label-commodity').each((_, el) => {
+                const $el = $(el);
+                const name = $el.find('span').first().text().trim();
+                const code = name.split(' ')[0];
+                const priceText = $el.find('span').last().text().trim();
+                const isNA = priceText.includes('N/A');
+                const price = isNA ? null : parseInt(priceText.match(/\d+/)?.[0] || '0');
+                const slug = $el.attr('slug') || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+                commodities.push({
+                    name,
+                    code,
+                    value: slug,
+                    avgPrice: price,
+                    isPriceNA: isNA
+                });
+            });
+
+            return commodities;
+        } catch (error) {
+            console.error('Error fetching commodities:', error);
+            throw TradeError.fromResponse(error as ErrorResponse);
+        }
+    }
+
+    public async getCommodityPrices(code: string): Promise<PriceData> {
+        return this.getPrices(code);
+    }
+
+    public async getLocationPrices(code: string): Promise<PriceData> {
+        try {
+            const html = await this.makeRequest(`${this.baseUrl}/commodities/locations/name/${code}/`);
+            return this.parsePriceData(html);
+        } catch (error) {
+            console.error('Error fetching location prices:', error);
+            throw TradeError.fromResponse(error as ErrorResponse);
+        }
+    }
+
+    private async getPrices(commodity: string): Promise<PriceData> {
+        try {
+            const html = await this.makeRequest(`${this.baseUrl}/commodities/info/name/${commodity}/tab/locations_buying/`);
+            return this.parsePriceData(html);
+        } catch (error) {
+            console.error('Error fetching prices:', error);
+            throw TradeError.fromResponse(error as ErrorResponse);
+        }
+    }
+
+    private parsePriceData(html: string): PriceData {
+        const $ = cheerio.load(html);
+        const locations: TradeLocation[] = [];
+
+        $('#table-sell tr.row-location').each((_, row) => {
+            const $row = $(row);
+            const name = $row.find('td:first-child a').text().trim();
+            const orbit = $row.find('td:nth-child(2)').text().trim();
+            const system = $row.find('td:nth-child(3)').text().trim();
+            const faction = $row.find('td:nth-child(4)').text().trim();
+            const type = 'STATION'; // Default type, could be parsed from data if available
+
+            // Get price data
+            const price = parseInt($row.find('td[data-value]').eq(10).attr('data-value') || '0');
+            const minPrice = parseInt($row.find('td[data-value]').eq(13).attr('data-value') || '0');
+            const maxPrice = parseInt($row.find('td[data-value]').eq(14).attr('data-value') || '0');
+            const avgPrice = parseInt($row.find('td[data-value]').eq(12).attr('data-value') || '0');
+
+            // Get inventory data
+            const inventory = parseInt($row.find('td[title*="SCU"]').first().attr('data-value') || '0');
+            const minInventory = parseInt($row.find('td[data-value]').eq(7).attr('data-value') || '0');
+            const maxInventory = parseInt($row.find('td[data-value]').eq(8).attr('data-value') || '0');
+            const avgInventory = parseInt($row.find('td[data-value]').eq(6).attr('data-value') || '0');
+
+            // Get container sizes
+            const containerText = $row.find('td[title*="SCU"]').last().attr('title') || '';
+            const containerSizes = containerText.match(/\d+/g)?.map(Number) || [];
+
+            // Check if it's a "No Questions Asked" terminal
+            const isNoQuestions = $row.find('i.fa-low-vision').length > 0;
+
+            // Create buy/sell price entries
+            const buyPrices = [createPriceEntry({
+                price,
+                timestamp: new Date().toISOString(),
+                supply: inventory
+            })];
+
+            const sellPrices = [createPriceEntry({
+                price,
+                timestamp: new Date().toISOString(),
+                demand: inventory
+            })];
+
+            locations.push({
+                name,
+                orbit,
+                system,
+                faction,
+                code: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                type,
+                price: { current: price, min: minPrice, max: maxPrice, avg: avgPrice },
+                inventory: { current: inventory, min: minInventory, max: maxInventory, avg: avgInventory },
+                containerSizes,
+                isNoQuestions,
+                prices: {
+                    buy: buyPrices,
+                    sell: sellPrices
+                }
+            });
+        });
+
+        // Calculate overall stats
+        const prices = locations.map(l => l.price.current).filter(p => p > 0);
+        const min = Math.min(...(prices.length ? prices : [0]));
+        const max = Math.max(...(prices.length ? prices : [0]));
+        const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+        const median = prices.length ? prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)] : 0;
+
+        return {
+            locations,
+            prices: {},
+            min,
+            max,
+            avg,
+            median
+        };
+    }
 }
+
+const scraper = new TradeScraper();
+export { TradeScraper };
+export default scraper;
