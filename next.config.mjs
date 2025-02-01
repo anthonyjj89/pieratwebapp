@@ -5,6 +5,7 @@ const nextConfig = {
   images: {
     domains: ['cdn.discordapp.com'],
   },
+  output: 'standalone',
   async headers() {
     return [
       {
