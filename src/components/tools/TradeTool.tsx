@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { TradeScraper } from '@/services/trade/scraper';
 import type { CommodityPrice, TradeLocation } from '@/services/trade/types';
