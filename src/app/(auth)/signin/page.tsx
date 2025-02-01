@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   description: 'Sign in to your PieRat account using Discord',
 };
 
-export default async function SignIn() {
+export default async function SignInPage() {
   const providers = await getProviders();
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black flex items-center justify-center">
       <div className="max-w-md w-full space-y-8 p-8 bg-gray-800 rounded-lg shadow-lg">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white">Welcome to PieRat</h1>

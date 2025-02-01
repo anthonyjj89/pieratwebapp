@@ -1,10 +1,7 @@
 import NextAuth from 'next-auth';
 import DiscordProvider from 'next-auth/providers/discord';
-import { MongoDBAdapter } from '@auth/mongodb-adapter';
-import clientPromise from '@/lib/mongodb';
 
 const handler = NextAuth({
-  adapter: MongoDBAdapter(clientPromise),
   providers: [
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
@@ -28,16 +25,23 @@ const handler = NextAuth({
     })
   ],
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async session({ session, user }) {
+    async session({ session, token }) {
       if (session?.user) {
-        session.user.id = user.id;
-        session.user.discordId = user.id;
+        session.user.id = token.sub as string;
+        session.user.discordId = token.sub as string;
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
     }
   },
   pages: {
