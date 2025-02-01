@@ -2,11 +2,6 @@
 
 import { useState } from 'react';
 
-export const metadata = {
-  title: 'Settings - PieRat',
-  description: 'Configure your organization settings',
-};
-
 export default function SettingsPage() {
   const [orgName, setOrgName] = useState('');
   const [orgDescription, setOrgDescription] = useState('');
