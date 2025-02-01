@@ -1,20 +1,10 @@
 import NextAuth from 'next-auth';
 import DiscordProvider from 'next-auth/providers/discord';
-import { MongoClient } from 'mongodb';
-
-const client = new MongoClient(process.env.MONGODB_URI!);
-const db = client.db(process.env.MONGODB_DB);
-
-// Define custom user type that includes discordId
-interface CustomUser {
-  id: string;
-  discordId: string;
-  name: string;
-  email: string;
-  image?: string;
-}
+import { MongoDBAdapter } from '@auth/mongodb-adapter';
+import clientPromise from '@/lib/mongodb';
 
 const handler = NextAuth({
+  adapter: MongoDBAdapter(clientPromise),
   providers: [
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
@@ -37,34 +27,17 @@ const handler = NextAuth({
       }
     })
   ],
+  session: {
+    strategy: 'database',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === 'discord') {
-        await client.connect();
-        await db.collection('users').updateOne(
-          { discordId: user.id },
-          {
-            $set: {
-              name: user.name,
-              email: user.email,
-              image: user.image,
-              updatedAt: new Date()
-            }
-          },
-          { upsert: true }
-        );
-      }
-      return true;
-    },
     async session({ session, user }) {
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id: user.id,
-          discordId: user.id
-        }
-      };
+      if (session?.user) {
+        session.user.id = user.id;
+        session.user.discordId = user.id;
+      }
+      return session;
     }
   },
   pages: {
