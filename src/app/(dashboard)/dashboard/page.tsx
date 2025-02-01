@@ -5,7 +5,7 @@ export default function DashboardPage() {
       
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="bg-gray-900 overflow-hidden shadow rounded-lg">
+        <div className="bg-gray-900/50 backdrop-blur-sm overflow-hidden shadow-lg rounded-lg border border-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl">
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -25,7 +25,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-gray-900 overflow-hidden shadow rounded-lg">
+        <div className="bg-gray-900/50 backdrop-blur-sm overflow-hidden shadow-lg rounded-lg border border-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl">
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -45,7 +45,7 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        <div className="bg-gray-900 overflow-hidden shadow rounded-lg">
+        <div className="bg-gray-900/50 backdrop-blur-sm overflow-hidden shadow-lg rounded-lg border border-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl">
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -69,7 +69,7 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <div className="mt-8">
         <h2 className="text-xl font-semibold text-white mb-4">Recent Activity</h2>
-        <div className="bg-gray-900 shadow overflow-hidden sm:rounded-lg">
+        <div className="bg-gray-900/50 backdrop-blur-sm shadow-lg overflow-hidden rounded-lg border border-white/10">
           <div className="p-6 text-center text-gray-400">
             No recent activity
           </div>
