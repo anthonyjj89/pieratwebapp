@@ -41,6 +41,8 @@ export interface LocationPrice {
     price?: {
         current: number;
         avg: number;
+        min?: number;
+        max?: number;
     };
     prices: {
         buy: PriceEntry[];
@@ -56,7 +58,10 @@ export interface LocationPrice {
     isNoQuestions?: boolean;
 }
 
-export interface PriceData {
+// Base Price Data
+export interface BasePriceData {
+    code: string;
+    name: string;
     buy: PriceEntry[];
     sell: PriceEntry[];
     locations: LocationPrice[];
@@ -95,31 +100,9 @@ export interface TradeLocation {
 }
 
 // API Response Types
-export interface LocationPrices {
-    code: string;
-    name: string;
-    type: string;
-    system: string;
-    locations: Array<{
-        name: string;
-        prices: {
-            buy: PriceEntry[];
-            sell: PriceEntry[];
-        };
-    }>;
-}
-
-export interface CommodityPrices {
-    code: string;
-    name: string;
-    prices: Array<{
-        location: string;
-        system: string;
-        price: number;
-        quantity: number;
-        timestamp: string;
-    }>;
-}
+export type LocationPrices = BasePriceData;
+export type CommodityPrices = BasePriceData;
+export type PriceData = BasePriceData;
 
 // Scraper Options
 export interface ScrapeOptions {

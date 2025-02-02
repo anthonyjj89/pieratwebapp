@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { RSIProfile } from '@/services/rsi/types';
 import { LocationPrices, CommodityPrices } from '@/services/trade/types';
 
@@ -27,4 +27,9 @@ export type TradeRouteContext = RouteContext<{ code: string | string[] }>;
 export type RouteHandler<T, R> = (
     request: NextRequest,
     context: RouteContext<T>
-) => Promise<R>;
+) => Promise<NextResponse<R>>;
+
+// Route Handler Types
+export type PlayerRouteHandler = RouteHandler<{ handle: string | string[] }, PlayerResponse>;
+export type CommodityRouteHandler = RouteHandler<{ code: string | string[] }, CommodityResponse>;
+export type LocationRouteHandler = RouteHandler<{ code: string | string[] }, LocationResponse>;

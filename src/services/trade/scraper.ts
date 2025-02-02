@@ -69,6 +69,8 @@ export class TradeScraper {
             const html = await this.makeRequest(`${this.baseUrl}/commodity/${code}`);
             const $ = cheerio.load(html);
 
+            const name = $('.commodity-name').text().trim();
+
             const buyPrices = $('.buy-prices .price-entry').map((_, el) => {
                 const $el = $(el);
                 return createPriceEntry({
@@ -135,6 +137,8 @@ export class TradeScraper {
             const median = prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)];
 
             return {
+                code,
+                name,
                 buy: buyPrices,
                 sell: sellPrices,
                 locations,

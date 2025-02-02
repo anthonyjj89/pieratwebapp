@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
 import { TradeError } from '@/services/trade/types';
+import { LocationRouteHandler } from '@/types/api';
 
-export async function GET(
+export const GET: LocationRouteHandler = async (
     request: NextRequest,
     context: { params: { code: string | string[] } }
-) {
+) => {
     try {
         const code = Array.isArray(context.params.code) ? context.params.code[0] : context.params.code;
         if (!code) {
@@ -37,9 +38,11 @@ export async function GET(
         );
 
         return NextResponse.json({
-            ...data,
-            buyPrices,
-            sellPrices
+            data: {
+                ...data,
+                buyPrices,
+                sellPrices
+            }
         });
 
     } catch (error) {
@@ -57,4 +60,4 @@ export async function GET(
             { status: 500 }
         );
     }
-}
+};

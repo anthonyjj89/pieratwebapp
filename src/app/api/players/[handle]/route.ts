@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/rsi/scraper';
 import { RSIError } from '@/services/rsi/types';
+import { PlayerRouteHandler } from '@/types/api';
 
-export async function GET(
+export const GET: PlayerRouteHandler = async (
     request: NextRequest,
     context: { params: { handle: string | string[] } }
-) {
+) => {
     try {
         const handle = Array.isArray(context.params.handle) ? context.params.handle[0] : context.params.handle;
         if (!handle) {
@@ -15,7 +16,7 @@ export async function GET(
         // Get profile data
         const profile = await scraper.getProfileData(handle);
 
-        return NextResponse.json(profile);
+        return NextResponse.json({ data: profile });
 
     } catch (error) {
         console.error('Error fetching player data:', error);
@@ -32,4 +33,4 @@ export async function GET(
             { status: 500 }
         );
     }
-}
+};
