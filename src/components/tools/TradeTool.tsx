@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { LocationPrice, PriceData } from '@/services/trade/types';
 
-// Props interface for the TradeTool component
 interface TradeToolProps {
     onResult?: (data: PriceData) => void;
 }
@@ -30,9 +29,9 @@ export default function TradeTool({ onResult }: TradeToolProps) {
                 throw new Error(result.error || 'Failed to fetch trade data');
             }
 
-            setData(result);
+            setData(result.data);
             if (onResult) {
-                onResult(result);
+                onResult(result.data);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch trade data');
