@@ -1,80 +1,41 @@
+import { StatsCard } from '@/components/dashboard';
+import { HitReportForm } from '@/components/reports';
+
 export default function DashboardPage() {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold text-white mb-8">Overview</h1>
-      
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="bg-gray-900/50 backdrop-blur-sm overflow-hidden shadow-lg rounded-lg border border-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <span className="text-2xl">📊</span>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-400 truncate">
-                    Total Reports
-                  </dt>
-                  <dd className="text-lg font-medium text-white">
-                    0
-                  </dd>
-                </dl>
-              </div>
+    return (
+        <div className="space-y-8">
+            {/* Stats Overview */}
+            <div className="grid grid-cols-3 gap-4">
+                <StatsCard
+                    title="Total Reports"
+                    value="0"
+                    trend={{ value: 0, label: "vs last week" }}
+                />
+                <StatsCard
+                    title="Active Crew"
+                    value="0"
+                    trend={{ value: 0, label: "vs last week" }}
+                />
+                <StatsCard
+                    title="Total Earnings"
+                    value="0 aUEC"
+                    trend={{ value: 0, label: "vs last week" }}
+                />
             </div>
-          </div>
-        </div>
 
-        <div className="bg-gray-900/50 backdrop-blur-sm overflow-hidden shadow-lg rounded-lg border border-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <span className="text-2xl">👥</span>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-400 truncate">
-                    Active Crew
-                  </dt>
-                  <dd className="text-lg font-medium text-white">
-                    0
-                  </dd>
-                </dl>
-              </div>
+            {/* Hit Report Form */}
+            <div>
+                <h2 className="text-2xl font-bold mb-4">Submit Hit Report</h2>
+                <HitReportForm />
             </div>
-          </div>
-        </div>
-        
-        <div className="bg-gray-900/50 backdrop-blur-sm overflow-hidden shadow-lg rounded-lg border border-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <span className="text-2xl">💰</span>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-400 truncate">
-                    Total Earnings
-                  </dt>
-                  <dd className="text-lg font-medium text-white">
-                    0 aUEC
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Recent Activity */}
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold text-white mb-4">Recent Activity</h2>
-        <div className="bg-gray-900/50 backdrop-blur-sm shadow-lg overflow-hidden rounded-lg border border-white/10">
-          <div className="p-6 text-center text-gray-400">
-            No recent activity
-          </div>
+            {/* Recent Activity */}
+            <div>
+                <h2 className="text-2xl font-bold mb-4">Recent Activity</h2>
+                <div className="p-4 bg-black/20 backdrop-blur-sm rounded">
+                    <p className="text-center opacity-75">No recent activity</p>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }

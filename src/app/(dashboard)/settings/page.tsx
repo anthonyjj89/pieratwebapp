@@ -1,134 +1,104 @@
 export default function SettingsPage() {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold text-white mb-8">Settings</h1>
-      
-      <div className="space-y-8">
-        {/* Organization Settings */}
-        <div className="bg-gray-900 shadow rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-lg font-medium text-white">Organization Settings</h2>
-            <p className="mt-1 text-sm text-gray-400">
-              Manage your organization&apos;s profile and preferences
-            </p>
-          </div>
-          <div className="border-t border-gray-800 px-4 py-5 sm:px-6">
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300">
-                  Organization Name
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    className="block w-full bg-gray-800 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="Enter organization name"
-                  />
-                </div>
-              </div>
+    return (
+        <div className="space-y-8">
+            {/* Organization Settings */}
+            <div>
+                <h2 className="text-2xl font-bold mb-4">Organization Settings</h2>
+                <div className="space-y-4">
+                    <div className="p-4 bg-black/20 backdrop-blur-sm rounded">
+                        <h3 className="font-semibold mb-4">Organization Details</h3>
+                        <form className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Organization Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="Enter organization name"
+                                    className="w-full px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Description</label>
+                                <textarea
+                                    placeholder="Enter organization description"
+                                    className="w-full h-24 px-3 py-2 bg-black/20 backdrop-blur-sm border rounded resize-none"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500"
+                            >
+                                Save Changes
+                            </button>
+                        </form>
+                    </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300">
-                  Description
-                </label>
-                <div className="mt-1">
-                  <textarea
-                    rows={3}
-                    className="block w-full bg-gray-800 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="Enter organization description"
-                  />
+                    <div className="p-4 bg-black/20 backdrop-blur-sm rounded">
+                        <h3 className="font-semibold mb-4">Profit Sharing</h3>
+                        <form className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Default Share Percentage</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        placeholder="Enter percentage"
+                                        className="w-32 px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
+                                    />
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Distribution Method</label>
+                                <select className="w-full px-3 py-2 bg-black/20 backdrop-blur-sm border rounded">
+                                    <option value="equal">Equal Split</option>
+                                    <option value="role">Role Based</option>
+                                    <option value="contribution">By Contribution</option>
+                                </select>
+                            </div>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500"
+                            >
+                                Save Changes
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="p-4 bg-black/20 backdrop-blur-sm rounded">
+                        <h3 className="font-semibold mb-4">Roles & Permissions</h3>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-2 bg-black/10 rounded">
+                                <div>
+                                    <p className="font-medium">Admin</p>
+                                    <p className="text-sm opacity-75">Full access to all features</p>
+                                </div>
+                                <button className="text-blue-400 hover:text-blue-300">Edit</button>
+                            </div>
+                            <div className="flex items-center justify-between p-2 bg-black/10 rounded">
+                                <div>
+                                    <p className="font-medium">Member</p>
+                                    <p className="text-sm opacity-75">Basic access to reports and analytics</p>
+                                </div>
+                                <button className="text-blue-400 hover:text-blue-300">Edit</button>
+                            </div>
+                            <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500">
+                                Add New Role
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Danger Zone */}
+                    <div className="p-4 bg-red-500/10 border border-red-500 rounded">
+                        <h3 className="font-semibold text-red-500 mb-4">Danger Zone</h3>
+                        <div className="space-y-4">
+                            <button className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-500">
+                                Delete Organization
+                            </button>
+                        </div>
+                    </div>
                 </div>
-              </div>
             </div>
-          </div>
         </div>
-
-        {/* Discord Integration */}
-        <div className="bg-gray-900 shadow rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-lg font-medium text-white">Discord Integration</h2>
-            <p className="mt-1 text-sm text-gray-400">
-              Configure Discord bot settings and notifications
-            </p>
-          </div>
-          <div className="border-t border-gray-800 px-4 py-5 sm:px-6">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-300">Bot Status</p>
-                  <p className="text-sm text-gray-400">Connected to Discord server</p>
-                </div>
-                <span className="px-3 py-1 text-sm rounded-full bg-green-900 text-green-300">
-                  Active
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300">
-                  Notification Channel
-                </label>
-                <select className="mt-1 block w-full bg-gray-800 border border-gray-700 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                  <option>#general</option>
-                  <option>#notifications</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Preferences */}
-        <div className="bg-gray-900 shadow rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-lg font-medium text-white">Preferences</h2>
-            <p className="mt-1 text-sm text-gray-400">
-              Customize your dashboard experience
-            </p>
-          </div>
-          <div className="border-t border-gray-800 px-4 py-5 sm:px-6">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-300">Email Notifications</p>
-                  <p className="text-sm text-gray-400">Receive email updates for important events</p>
-                </div>
-                <button
-                  type="button"
-                  className="bg-gray-800 relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                  role="switch"
-                  aria-checked="false"
-                >
-                  <span className="translate-x-0 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-gray-500 shadow ring-0 transition duration-200 ease-in-out"></span>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-300">Discord Notifications</p>
-                  <p className="text-sm text-gray-400">Receive Discord DMs for important events</p>
-                </div>
-                <button
-                  type="button"
-                  className="bg-indigo-600 relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                  role="switch"
-                  aria-checked="true"
-                >
-                  <span className="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-          >
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }
