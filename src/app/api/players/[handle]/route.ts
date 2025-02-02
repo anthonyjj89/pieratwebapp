@@ -2,17 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/rsi/scraper';
 import { RSIError } from '@/services/rsi/types';
 
-// Destructure searchParams but prefix with _ to indicate it's intentionally unused
 export async function GET(
-    _request: NextRequest,
-    context: {
-        params: { handle: string | string[] },
-        searchParams: URLSearchParams
-    }
+    request: NextRequest,
+    context: { params: { handle: string | string[] } }
 ) {
     try {
-        const { params } = context;
-        const handle = Array.isArray(params.handle) ? params.handle[0] : params.handle;
+        const handle = Array.isArray(context.params.handle) ? context.params.handle[0] : context.params.handle;
         if (!handle) {
             return NextResponse.json({ error: 'Handle is required' }, { status: 400 });
         }
