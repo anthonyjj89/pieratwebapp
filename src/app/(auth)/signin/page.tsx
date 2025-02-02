@@ -1,26 +1,40 @@
+import { Suspense } from 'react';
 import { SignInForm } from '@/components/auth/SignInForm';
+import Image from 'next/image';
+
+function LoadingButton() {
+  return (
+    <button
+      disabled
+      className="w-full flex items-center justify-center gap-3 bg-[#5865F2] hover:bg-[#4752C4] text-white py-3 px-4 rounded-lg font-medium transition-colors duration-200 opacity-50 cursor-not-allowed"
+    >
+      <Image
+        src="/discord-mark-white.svg"
+        alt="Discord"
+        width={24}
+        height={24}
+      />
+      <span className="animate-pulse">Loading...</span>
+    </button>
+  );
+}
 
 export default function SignInPage() {
   return (
-    <div className="relative min-h-screen flex items-center">
-      {/* Background image with overlay */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center z-0"
-        style={{ backgroundImage: 'url("/images/background.png")' }}
-      />
-      
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-radial from-black/70 via-black/80 to-black/90 z-10" />
-      
-      {/* Grid pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px] z-20" />
-
-      {/* Content */}
-      <div className="relative z-30 ml-[33%] -translate-x-1/2 w-full max-w-sm p-8">
-        <div className="bg-black/50 backdrop-blur-sm rounded-lg p-8 shadow-xl border border-white/10">
-          <h1 className="text-3xl font-bold text-white mb-6">Sign in to PieRat</h1>
-          <SignInForm />
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight">
+            Welcome to PieRat
+          </h2>
+          <p className="mt-2 text-sm text-gray-400">
+            Sign in with Discord to continue
+          </p>
         </div>
+
+        <Suspense fallback={<LoadingButton />}>
+          <SignInForm />
+        </Suspense>
       </div>
     </div>
   );
