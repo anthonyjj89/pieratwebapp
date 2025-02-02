@@ -1,12 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
 
+type Props = {
+    params: Promise<{ code: string }>;
+};
+
 export async function GET(
-    _request: NextRequest,
-    { params }: { params: { code: string } }
+    request: Request,
+    { params }: Props
 ) {
     try {
-        const { code } = params;
+        const { code } = await params;
         const location = await scraper.getLocationData(code);
 
         // Transform location data into expected format

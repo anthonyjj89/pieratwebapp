@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
     try {
-        const searchParams = request.nextUrl.searchParams;
-        const query = searchParams.get('q') || '';
+        const url = new URL(request.url);
+        const query = url.searchParams.get('q') || '';
 
         // Get all commodities and filter by query
         const commodities = await scraper.getCommodities();

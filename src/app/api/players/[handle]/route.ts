@@ -1,12 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import scraper from '@/services/rsi/scraper';
 
+type Props = {
+    params: Promise<{ handle: string }>;
+};
+
 export async function GET(
-    _request: NextRequest,
-    { params }: { params: { handle: string } }
+    request: Request,
+    { params }: Props
 ) {
     try {
-        const { handle } = params;
+        const { handle } = await params;
         const data = await scraper.getProfileData(handle);
 
         return NextResponse.json({ data });
