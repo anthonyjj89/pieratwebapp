@@ -95,7 +95,6 @@ export class TradeScraper {
                 const system = $el.find('.system').text().trim();
                 const orbit = $el.find('.orbit').text().trim() || undefined;
                 const type = $el.find('.type').text().trim() || undefined;
-                const faction = $el.find('.faction').text().trim() || undefined;
 
                 const price = {
                     current: parseFloat($el.find('.current-price').text().trim()),
@@ -165,7 +164,6 @@ export class TradeScraper {
                 const system = $el.find('.system').text().trim();
                 const description = $el.find('.description').text().trim();
                 const orbit = $el.find('.orbit').text().trim() || undefined;
-                const faction = $el.find('.faction').text().trim() || undefined;
 
                 locations.push({
                     code,
@@ -173,8 +171,7 @@ export class TradeScraper {
                     type,
                     system,
                     description,
-                    orbit,
-                    faction
+                    orbit
                 });
             });
 

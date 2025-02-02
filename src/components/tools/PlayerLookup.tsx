@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { RSIProfile } from '@/services/rsi/types';
 
 interface PlayerLookupProps {
@@ -69,11 +70,15 @@ export default function PlayerLookup({ onResult }: PlayerLookupProps) {
                 <div className="space-y-4 p-4 bg-black/20 backdrop-blur-sm rounded">
                     <div className="flex items-start gap-4">
                         {profile.avatarUrl && (
-                            <img
-                                src={profile.avatarUrl}
-                                alt={`${profile.handle}'s avatar`}
-                                className="w-20 h-20 rounded"
-                            />
+                            <div className="relative w-20 h-20">
+                                <Image
+                                    src={profile.avatarUrl}
+                                    alt={`${profile.handle}'s avatar`}
+                                    fill
+                                    className="rounded object-cover"
+                                    unoptimized // Since this is an external URL
+                                />
+                            </div>
                         )}
                         <div>
                             <h3 className="text-xl font-bold">{profile.handle}</h3>
@@ -89,11 +94,15 @@ export default function PlayerLookup({ onResult }: PlayerLookupProps) {
                             <h4 className="font-semibold mb-2">Main Organization</h4>
                             <div className="flex items-center gap-3">
                                 {profile.mainOrg.logoUrl && (
-                                    <img
-                                        src={profile.mainOrg.logoUrl}
-                                        alt={`${profile.mainOrg.name} logo`}
-                                        className="w-12 h-12 rounded"
-                                    />
+                                    <div className="relative w-12 h-12">
+                                        <Image
+                                            src={profile.mainOrg.logoUrl}
+                                            alt={`${profile.mainOrg.name} logo`}
+                                            fill
+                                            className="rounded object-cover"
+                                            unoptimized // Since this is an external URL
+                                        />
+                                    </div>
                                 )}
                                 <div>
                                     <p className="font-medium">{profile.mainOrg.name}</p>
@@ -110,11 +119,15 @@ export default function PlayerLookup({ onResult }: PlayerLookupProps) {
                                 {profile.affiliatedOrgs.map((org, index) => (
                                     <div key={index} className="flex items-center gap-3">
                                         {org.logoUrl && (
-                                            <img
-                                                src={org.logoUrl}
-                                                alt={`${org.name} logo`}
-                                                className="w-8 h-8 rounded"
-                                            />
+                                            <div className="relative w-8 h-8">
+                                                <Image
+                                                    src={org.logoUrl}
+                                                    alt={`${org.name} logo`}
+                                                    fill
+                                                    className="rounded object-cover"
+                                                    unoptimized // Since this is an external URL
+                                                />
+                                            </div>
                                         )}
                                         <div>
                                             <p className="font-medium">{org.name}</p>
