@@ -3,10 +3,14 @@ import scraper from '@/services/trade/scraper';
 import { TradeError } from '@/services/trade/types';
 
 export async function GET(
-    request: NextRequest,
-    { params }: { params: { code: string | string[] } }
+    _request: NextRequest,
+    context: {
+        params: { code: string | string[] },
+        searchParams: URLSearchParams
+    }
 ) {
     try {
+        const { params } = context;
         const code = Array.isArray(params.code) ? params.code[0] : params.code;
         if (!code) {
             return NextResponse.json({ error: 'Location code is required' }, { status: 400 });
