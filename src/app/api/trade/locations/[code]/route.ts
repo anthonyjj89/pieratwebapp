@@ -17,11 +17,11 @@ export async function GET(
         }
 
         // Get location prices
-        const data = await scraper.getLocationPrices(code);
+        const data = await scraper.getCommodityPrices(code);
 
         // Format response
         const buyPrices = data.locations.flatMap(location => 
-            location.prices.buy.map(entry => ({
+            location.prices.buy.map((entry) => ({
                 commodity: entry.commodity,
                 price: entry.price,
                 quantity: entry.quantity,
@@ -31,7 +31,7 @@ export async function GET(
         );
 
         const sellPrices = data.locations.flatMap(location => 
-            location.prices.sell.map(entry => ({
+            location.prices.sell.map((entry) => ({
                 commodity: entry.commodity,
                 price: entry.price,
                 quantity: entry.quantity,

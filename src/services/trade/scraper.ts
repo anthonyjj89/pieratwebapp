@@ -1,75 +1,63 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import type { TradeCommodity, TradeLocation, PriceData, ScrapeOptions, ErrorResponse } from './types';
-import { TradeError, createPriceEntry } from './types';
+import { TradeCommodity, TradeLocation, PriceData, createPriceEntry, TradeError, ErrorResponse, LocationPrice } from './types';
 
-class TradeScraper {
+export class TradeScraper {
     private baseUrl: string;
     private headers: Record<string, string>;
-    private options: Required<ScrapeOptions>;
 
-    constructor(options: ScrapeOptions = {}) {
+    constructor() {
         this.baseUrl = 'https://uexcorp.space';
         this.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         };
-        this.options = {
-            timeout: options.timeout || 10000,
-            retries: options.retries || 3,
-            retryDelay: options.retryDelay || 1000,
-            cacheTime: options.cacheTime || 300000 // 5 minutes default
-        };
     }
 
     private async makeRequest(url: string): Promise<string> {
-        let retries = this.options.retries;
-        let lastError: ErrorResponse = { message: 'Unknown error' };
-
-        while (retries > 0) {
-            try {
-                const response = await axios({
-                    url,
-                    headers: this.headers,
-                    timeout: this.options.timeout
-                });
-                return response.data;
-            } catch (error) {
-                lastError = error as ErrorResponse;
-                retries--;
-                if (retries === 0) break;
-                console.log(`Request failed, retrying... (${retries} attempts left)`);
-                await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
-            }
+        try {
+            const response = await axios({
+                url,
+                headers: this.headers,
+                timeout: 10000
+            });
+            return response.data;
+        } catch (error) {
+            throw TradeError.fromResponse(error as ErrorResponse);
         }
+    }
 
-        throw TradeError.fromResponse(lastError);
+    private normalizeUrl(url: string | undefined): string | null {
+        if (!url) return null;
+        return url.startsWith('http') ? url : `${this.baseUrl}${url}`;
     }
 
     public async getCommodities(): Promise<TradeCommodity[]> {
         try {
             const html = await this.makeRequest(`${this.baseUrl}/commodities`);
             const $ = cheerio.load(html);
-            
             const commodities: TradeCommodity[] = [];
-            $('.label-commodity').each((_, el) => {
-                const $el = $(el);
-                const name = $el.find('span').first().text().trim();
-                const code = name.split(' ')[0];
-                const priceText = $el.find('span').last().text().trim();
-                const isNA = priceText.includes('N/A');
-                const price = isNA ? null : parseInt(priceText.match(/\d+/)?.[0] || '0');
-                const slug = $el.attr('slug') || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+            $('.commodity-item').each((_, element) => {
+                const $el = $(element);
+                const code = $el.find('.code').text().trim();
+                const name = $el.find('.name').text().trim();
+                const type = $el.find('.type').text().trim();
+                const description = $el.find('.description').text().trim();
+                const value = $el.find('.value').text().trim();
+                const avgPrice = parseFloat($el.find('.avg-price').text().trim()) || undefined;
 
                 commodities.push({
-                    name,
                     code,
-                    value: slug,
-                    avgPrice: price,
-                    isPriceNA: isNA
+                    name,
+                    type,
+                    description,
+                    value,
+                    avgPrice
                 });
             });
 
             return commodities;
+
         } catch (error) {
             console.error('Error fetching commodities:', error);
             throw TradeError.fromResponse(error as ErrorResponse);
@@ -77,110 +65,128 @@ class TradeScraper {
     }
 
     public async getCommodityPrices(code: string): Promise<PriceData> {
-        return this.getPrices(code);
-    }
-
-    public async getLocationPrices(code: string): Promise<PriceData> {
         try {
-            const html = await this.makeRequest(`${this.baseUrl}/commodities/locations/name/${code}/`);
-            return this.parsePriceData(html);
+            const html = await this.makeRequest(`${this.baseUrl}/commodity/${code}`);
+            const $ = cheerio.load(html);
+
+            const buyPrices = $('.buy-prices .price-entry').map((_, el) => {
+                const $el = $(el);
+                return createPriceEntry({
+                    commodity: code,
+                    price: parseFloat($el.find('.price').text().trim()),
+                    quantity: parseInt($el.find('.quantity').text().trim(), 10),
+                    supply: $el.find('.supply').text().trim()
+                });
+            }).get();
+
+            const sellPrices = $('.sell-prices .price-entry').map((_, el) => {
+                const $el = $(el);
+                return createPriceEntry({
+                    commodity: code,
+                    price: parseFloat($el.find('.price').text().trim()),
+                    quantity: parseInt($el.find('.quantity').text().trim(), 10),
+                    demand: $el.find('.demand').text().trim()
+                });
+            }).get();
+
+            const locations = $('.location-item').map((_, el) => {
+                const $el = $(el);
+                const name = $el.find('.name').text().trim();
+                const system = $el.find('.system').text().trim();
+                const orbit = $el.find('.orbit').text().trim() || undefined;
+                const type = $el.find('.type').text().trim() || undefined;
+                const faction = $el.find('.faction').text().trim() || undefined;
+
+                const price = {
+                    current: parseFloat($el.find('.current-price').text().trim()),
+                    avg: parseFloat($el.find('.avg-price').text().trim()),
+                    min: parseFloat($el.find('.min-price').text().trim()),
+                    max: parseFloat($el.find('.max-price').text().trim())
+                };
+
+                const inventory = {
+                    current: parseInt($el.find('.current-inventory').text().trim(), 10),
+                    max: parseInt($el.find('.max-inventory').text().trim(), 10),
+                    avg: parseFloat($el.find('.avg-inventory').text().trim())
+                };
+
+                const containerSizes = $el.find('.container-sizes').text().trim().split(',').map(s => s.trim());
+                const isNoQuestions = $el.hasClass('no-questions');
+
+                return {
+                    name,
+                    system,
+                    orbit,
+                    type,
+                    price,
+                    prices: {
+                        buy: buyPrices.filter(p => p.price > 0),
+                        sell: sellPrices.filter(p => p.price > 0)
+                    },
+                    inventory,
+                    containerSizes,
+                    isNoQuestions
+                } as LocationPrice;
+            }).get();
+
+            const prices = locations.map(l => l.price?.current || 0).filter(p => p > 0);
+            const min = Math.min(...prices);
+            const max = Math.max(...prices);
+            const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+            const median = prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)];
+
+            return {
+                buy: buyPrices,
+                sell: sellPrices,
+                locations,
+                min,
+                max,
+                avg,
+                median
+            };
+
         } catch (error) {
-            console.error('Error fetching location prices:', error);
+            console.error('Error fetching commodity prices:', error);
             throw TradeError.fromResponse(error as ErrorResponse);
         }
     }
 
-    private async getPrices(commodity: string): Promise<PriceData> {
+    public async getLocations(): Promise<TradeLocation[]> {
         try {
-            const html = await this.makeRequest(`${this.baseUrl}/commodities/info/name/${commodity}/tab/locations_buying/`);
-            return this.parsePriceData(html);
-        } catch (error) {
-            console.error('Error fetching prices:', error);
-            throw TradeError.fromResponse(error as ErrorResponse);
-        }
-    }
+            const html = await this.makeRequest(`${this.baseUrl}/locations`);
+            const $ = cheerio.load(html);
+            const locations: TradeLocation[] = [];
 
-    private parsePriceData(html: string): PriceData {
-        const $ = cheerio.load(html);
-        const locations: TradeLocation[] = [];
+            $('.location-item').each((_, element) => {
+                const $el = $(element);
+                const code = $el.find('.code').text().trim();
+                const name = $el.find('.name').text().trim();
+                const type = $el.find('.type').text().trim();
+                const system = $el.find('.system').text().trim();
+                const description = $el.find('.description').text().trim();
+                const orbit = $el.find('.orbit').text().trim() || undefined;
+                const faction = $el.find('.faction').text().trim() || undefined;
 
-        $('#table-sell tr.row-location').each((_, row) => {
-            const $row = $(row);
-            const name = $row.find('td:first-child a').text().trim();
-            const orbit = $row.find('td:nth-child(2)').text().trim();
-            const system = $row.find('td:nth-child(3)').text().trim();
-            const faction = $row.find('td:nth-child(4)').text().trim();
-            const type = 'STATION'; // Default type, could be parsed from data if available
-
-            // Get price data
-            const price = parseInt($row.find('td[data-value]').eq(10).attr('data-value') || '0');
-            const minPrice = parseInt($row.find('td[data-value]').eq(13).attr('data-value') || '0');
-            const maxPrice = parseInt($row.find('td[data-value]').eq(14).attr('data-value') || '0');
-            const avgPrice = parseInt($row.find('td[data-value]').eq(12).attr('data-value') || '0');
-
-            // Get inventory data
-            const inventory = parseInt($row.find('td[title*="SCU"]').first().attr('data-value') || '0');
-            const minInventory = parseInt($row.find('td[data-value]').eq(7).attr('data-value') || '0');
-            const maxInventory = parseInt($row.find('td[data-value]').eq(8).attr('data-value') || '0');
-            const avgInventory = parseInt($row.find('td[data-value]').eq(6).attr('data-value') || '0');
-
-            // Get container sizes
-            const containerText = $row.find('td[title*="SCU"]').last().attr('title') || '';
-            const containerSizes = containerText.match(/\d+/g)?.map(Number) || [];
-
-            // Check if it's a "No Questions Asked" terminal
-            const isNoQuestions = $row.find('i.fa-low-vision').length > 0;
-
-            // Create buy/sell price entries
-            const buyPrices = [createPriceEntry({
-                price,
-                timestamp: new Date().toISOString(),
-                supply: inventory
-            })];
-
-            const sellPrices = [createPriceEntry({
-                price,
-                timestamp: new Date().toISOString(),
-                demand: inventory
-            })];
-
-            locations.push({
-                name,
-                orbit,
-                system,
-                faction,
-                code: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-                type,
-                price: { current: price, min: minPrice, max: maxPrice, avg: avgPrice },
-                inventory: { current: inventory, min: minInventory, max: maxInventory, avg: avgInventory },
-                containerSizes,
-                isNoQuestions,
-                prices: {
-                    buy: buyPrices,
-                    sell: sellPrices
-                }
+                locations.push({
+                    code,
+                    name,
+                    type,
+                    system,
+                    description,
+                    orbit,
+                    faction
+                });
             });
-        });
 
-        // Calculate overall stats
-        const prices = locations.map(l => l.price.current).filter(p => p > 0);
-        const min = Math.min(...(prices.length ? prices : [0]));
-        const max = Math.max(...(prices.length ? prices : [0]));
-        const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-        const median = prices.length ? prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)] : 0;
+            return locations;
 
-        return {
-            locations,
-            prices: {},
-            min,
-            max,
-            avg,
-            median
-        };
+        } catch (error) {
+            console.error('Error fetching locations:', error);
+            throw TradeError.fromResponse(error as ErrorResponse);
+        }
     }
 }
 
-// Create a singleton instance
+// Create and export a singleton instance
 const scraper = new TradeScraper();
-export type { TradeScraper };  // Export type only
-export default scraper;      // Export instance as default
+export default scraper;

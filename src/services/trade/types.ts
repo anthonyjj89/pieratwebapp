@@ -1,88 +1,127 @@
-export interface TradeCommodity {
-    name: string;
-    code: string;
-    value: string;
-    avgPrice: number | null;
-    isPriceNA: boolean;
+// Error Types
+export class TradeError extends Error {
+    constructor(
+        message: string,
+        public statusCode?: number
+    ) {
+        super(message);
+        this.name = 'TradeError';
+    }
+
+    static fromResponse(error: ErrorResponse): TradeError {
+        const message = error.message || 'Unknown error';
+        const statusCode = error.response?.status;
+        return new TradeError(message, statusCode);
+    }
 }
 
+export interface ErrorResponse {
+    message: string;
+    response?: {
+        status: number;
+        data?: unknown;
+    };
+    code?: string;
+}
+
+// Price Types
 export interface PriceEntry {
+    commodity: string;
     price: number;
     quantity: number;
+    supply?: string;
+    demand?: string;
     timestamp: string;
-    commodity?: string;
-    supply?: number;
-    demand?: number;
 }
 
-export interface PriceStats {
+export interface LocationPrice {
+    name: string;
+    system: string;
+    orbit?: string;
+    price?: {
+        current: number;
+        avg: number;
+    };
+    prices: {
+        buy: PriceEntry[];
+        sell: PriceEntry[];
+    };
+    inventory?: {
+        current: number;
+        max: number;
+        avg?: number;
+    };
+    containerSizes?: string[];
+    type?: string;
+    isNoQuestions?: boolean;
+}
+
+export interface PriceData {
+    buy: PriceEntry[];
+    sell: PriceEntry[];
+    locations: LocationPrice[];
     min: number;
     max: number;
     avg: number;
-    median?: number;
+    median: number;
 }
 
-export interface PriceList extends Array<PriceEntry>, PriceStats {}
-
-export interface CommodityPrice {
-    name: string;
+// Trade Types
+export interface TradeCommodity {
     code: string;
-    prices: {
-        buy: PriceList;
-        sell: PriceList;
-    };
+    name: string;
+    type: string;
+    description?: string;
+    value: string;
+    avgPrice?: number;
 }
 
 export interface TradeLocation {
-    name: string;
-    orbit: string;
-    system: string;
-    faction: string;
     code: string;
-    type: 'STATION' | 'CITY' | 'OUTPOST';
-    price: {
+    name: string;
+    type: string;
+    system: string;
+    description?: string;
+    orbit?: string;
+    faction?: string;
+    price?: {
         current: number;
-        min: number;
-        max: number;
         avg: number;
     };
-    inventory: {
-        current: number;
-        min: number;
-        max: number;
-        avg: number;
-    };
-    containerSizes: number[];
-    isNoQuestions: boolean;
-    prices: {
+    prices?: {
         buy: PriceEntry[];
         sell: PriceEntry[];
     };
 }
 
-export interface TradeData {
-    bestLocation: TradeLocation;
-    averagePrice: number | null;
-    allLocations: TradeLocation[];
-    boxInfo: {
-        unitsPerBox: number;
-    };
+// API Response Types
+export interface LocationPrices {
+    code: string;
+    name: string;
+    type: string;
+    system: string;
+    locations: Array<{
+        name: string;
+        prices: {
+            buy: PriceEntry[];
+            sell: PriceEntry[];
+        };
+    }>;
 }
 
-export interface PriceStats {
-    min: number;
-    max: number;
-    avg: number;
-    median?: number;
+export interface CommodityPrices {
+    code: string;
+    name: string;
+    prices: Array<{
+        location: string;
+        system: string;
+        price: number;
+        quantity: number;
+        timestamp: string;
+    }>;
 }
 
-export interface PriceData extends PriceStats {
-    locations: TradeLocation[];
-    prices: {
-        [locationCode: string]: CommodityPrice;
-    };
-}
-
+// Scraper Options
 export interface ScrapeOptions {
     timeout?: number;
     retries?: number;
@@ -90,66 +129,16 @@ export interface ScrapeOptions {
     cacheTime?: number;
 }
 
-export type ErrorResponse = {
-    message?: string;
-    code?: string;
-    details?: string;
-    response?: {
-        status?: number;
-        data?: {
-            message?: string;
-            code?: string;
-            details?: string;
-        };
-    };
-    isAxiosError?: boolean;
-    error?: string;
-};
-
-export class TradeError extends Error {
-    code?: number;
-    details?: string;
-    statusCode?: number;
-
-    constructor(message: string) {
-        super(message);
-        this.name = 'TradeError';
-    }
-
-    static fromResponse(error: ErrorResponse): TradeError {
-        const tradeError = new TradeError(error.message || error.error || 'Unknown error');
-        if (error.response?.status) {
-            tradeError.code = error.response.status;
-            tradeError.statusCode = error.response.status;
-        } else if (error.code === 'ECONNABORTED') {
-            tradeError.code = 408; // Request Timeout
-            tradeError.statusCode = 408;
-        }
-        tradeError.details = error.details || error.response?.data?.details || error.response?.data?.message;
-        return tradeError;
-    }
-}
-
-// Helper function to create a price entry
-export function createPriceEntry(data: Partial<PriceEntry> & { price: number }): PriceEntry {
+// Helper Functions
+export function createPriceEntry(
+    data: Partial<PriceEntry> & { commodity: string; price: number; quantity: number }
+): PriceEntry {
     return {
-        price: data.price,
-        quantity: data.quantity || 0,
-        timestamp: data.timestamp || new Date().toISOString(),
         commodity: data.commodity,
+        price: data.price,
+        quantity: data.quantity,
         supply: data.supply,
-        demand: data.demand
+        demand: data.demand,
+        timestamp: data.timestamp || new Date().toISOString()
     };
-}
-
-// Helper function to create a price list with stats
-export function createPriceList(entries: PriceEntry[] = [], stats?: Partial<PriceStats>): PriceList {
-    const list = entries as PriceList;
-    list.min = stats?.min ?? 0;
-    list.max = stats?.max ?? 0;
-    list.avg = stats?.avg ?? 0;
-    if (stats?.median !== undefined) {
-        list.median = stats.median;
-    }
-    return list;
 }
