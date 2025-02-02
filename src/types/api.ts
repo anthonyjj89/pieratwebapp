@@ -8,28 +8,21 @@ export type ApiResponse<T> = {
     error?: string;
 };
 
-// Route Context Types
-export type RouteContext<T> = {
-    params: T;
-    searchParams: URLSearchParams;
-};
-
 // Players API
 export type PlayerResponse = ApiResponse<RSIProfile>;
-export type PlayerRouteContext = RouteContext<{ handle: string | string[] }>;
 
 // Trade API
 export type CommodityResponse = ApiResponse<CommodityPrices>;
 export type LocationResponse = ApiResponse<LocationPrices>;
-export type TradeRouteContext = RouteContext<{ code: string | string[] }>;
 
 // Generic Route Handler Type
-export type RouteHandler<T, R> = (
+export type RouteHandler<R> = (
     request: NextRequest,
-    context: RouteContext<T>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    context: any
 ) => Promise<NextResponse<R>>;
 
 // Route Handler Types
-export type PlayerRouteHandler = RouteHandler<{ handle: string | string[] }, PlayerResponse>;
-export type CommodityRouteHandler = RouteHandler<{ code: string | string[] }, CommodityResponse>;
-export type LocationRouteHandler = RouteHandler<{ code: string | string[] }, LocationResponse>;
+export type PlayerRouteHandler = RouteHandler<PlayerResponse>;
+export type CommodityRouteHandler = RouteHandler<CommodityResponse>;
+export type LocationRouteHandler = RouteHandler<LocationResponse>;

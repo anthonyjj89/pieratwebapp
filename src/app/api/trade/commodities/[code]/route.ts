@@ -1,14 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
 import { TradeError } from '@/services/trade/types';
 import { CommodityRouteHandler } from '@/types/api';
 
-export const GET: CommodityRouteHandler = async (
-    request: NextRequest,
-    context: { params: { code: string | string[] } }
-) => {
+export const GET: CommodityRouteHandler = async (request, context) => {
     try {
-        const code = Array.isArray(context.params.code) ? context.params.code[0] : context.params.code;
+        const { params } = context;
+        const code = Array.isArray(params.code) ? params.code[0] : params.code;
         if (!code) {
             return NextResponse.json({ error: 'Commodity code is required' }, { status: 400 });
         }

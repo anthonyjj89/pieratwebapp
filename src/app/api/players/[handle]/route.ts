@@ -1,14 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import scraper from '@/services/rsi/scraper';
 import { RSIError } from '@/services/rsi/types';
 import { PlayerRouteHandler } from '@/types/api';
 
-export const GET: PlayerRouteHandler = async (
-    request: NextRequest,
-    context: { params: { handle: string | string[] } }
-) => {
+export const GET: PlayerRouteHandler = async (request, context) => {
     try {
-        const handle = Array.isArray(context.params.handle) ? context.params.handle[0] : context.params.handle;
+        const { params } = context;
+        const handle = Array.isArray(params.handle) ? params.handle[0] : params.handle;
         if (!handle) {
             return NextResponse.json({ error: 'Handle is required' }, { status: 400 });
         }
