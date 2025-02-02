@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from 'react';
-import { StatsCard } from '@/components/dashboard';
-import { HitReportForm } from '@/components/reports';
-import { PlayerLookup, CargoLookup } from '@/components/tools';
-import { CargoData } from '@/services/trade/types';
-import { RSIProfile } from '@/services/rsi/types';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function DashboardPage() {
-    const [selectedTarget, setSelectedTarget] = useState<RSIProfile | null>(null);
-    const [selectedCargo, setSelectedCargo] = useState<CargoData | null>(null);
-    const { organization, loading, error } = useCurrentOrganization();
+    const router = useRouter();
+    const { organization, isLoading } = useCurrentOrganization();
 
-    if (loading) {
+    useEffect(() => {
+        if (!isLoading && !organization) {
+            router.push('/setup');
+        }
+    }, [organization, isLoading, router]);
+
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <p className="text-lg">Loading organization...</p>
@@ -21,75 +22,16 @@ export default function DashboardPage() {
         );
     }
 
-    if (error || !organization) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="p-4 bg-red-500/10 border border-red-500 rounded max-w-md">
-                    <p className="text-lg font-medium">Error</p>
-                    <p className="opacity-75">
-                        {error || 'No organization found. Please join or create an organization.'}
-                    </p>
-                </div>
-            </div>
-        );
+    if (!organization) {
+        return null; // Will redirect in useEffect
     }
 
     return (
-        <div className="space-y-8">
-            {/* Stats Overview */}
-            <div className="grid grid-cols-3 gap-4">
-                <StatsCard
-                    title="Total Reports"
-                    value="0"
-                    trend={{ value: 0, label: "vs last week" }}
-                />
-                <StatsCard
-                    title="Active Crew"
-                    value="0"
-                    trend={{ value: 0, label: "vs last week" }}
-                />
-                <StatsCard
-                    title="Total Earnings"
-                    value="0 aUEC"
-                    trend={{ value: 0, label: "vs last week" }}
-                />
-            </div>
-
-            {/* Main Content */}
-            <div className="grid grid-cols-3 gap-8">
-                {/* Hit Report Form */}
-                <div className="col-span-2 space-y-4">
-                    <h2 className="text-2xl font-bold">Submit Hit Report</h2>
-                    <HitReportForm 
-                        target={selectedTarget} 
-                        cargo={selectedCargo} 
-                        organizationId={organization.id}
-                    />
-                </div>
-
-                {/* Tools */}
-                <div className="space-y-8">
-                    {/* Target Lookup */}
-                    <div>
-                        <h3 className="text-lg font-semibold mb-4">Target Lookup</h3>
-                        <PlayerLookup onResult={setSelectedTarget} />
-                    </div>
-
-                    {/* Cargo Lookup */}
-                    <div>
-                        <h3 className="text-lg font-semibold mb-4">Cargo Lookup</h3>
-                        <CargoLookup onSelect={setSelectedCargo} />
-                    </div>
-                </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div>
-                <h2 className="text-2xl font-bold mb-4">Recent Activity</h2>
-                <div className="p-4 bg-black/20 backdrop-blur-sm rounded">
-                    <p className="text-center opacity-75">No recent activity</p>
-                </div>
-            </div>
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-8">
+                Welcome to {organization.name}
+            </h1>
+            {/* Dashboard content */}
         </div>
     );
 }

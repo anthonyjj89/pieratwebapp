@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { ObjectId } from 'mongodb';
-import clientPromise from '@/lib/mongodb';
+import dbConnect from '@/lib/db';
 import { Organization } from '@/models/organization';
 import { authOptions } from '@/lib/auth';
-import { Report, CreateReportBody, toClientReport } from '@/types/reports';
+import { CreateReportBody } from '@/types/reports';
+import { OrganizationMember } from '@/types/organizations';
 
-export async function GET(request: Request) {
+export async function GET(
+    request: Request,
+    { params }: { params: { id: string } }
+) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
@@ -16,22 +20,11 @@ export async function GET(request: Request) {
             );
         }
 
-        const { searchParams } = new URL(request.url);
-        const organizationId = searchParams.get('organizationId');
-
-        if (!organizationId) {
-            return NextResponse.json(
-                { error: 'Organization ID is required' },
-                { status: 400 }
-            );
-        }
-
-        const client = await clientPromise;
-        const db = client.db();
+        await dbConnect();
 
         // Check if organization exists and user is a member
         const organization = await Organization.findOne({
-            _id: new ObjectId(organizationId),
+            _id: new ObjectId(params.id),
             $or: [
                 { ownerId: session.user.id },
                 { 'members.discordUserId': session.user.discordId }
@@ -46,16 +39,13 @@ export async function GET(request: Request) {
         }
 
         // Get reports for this organization
-        const reports = await db
-            .collection<Report>('reports')
-            .find({ organizationId: new ObjectId(organizationId) })
-            .sort({ createdAt: -1 })
-            .toArray();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports?organizationId=${params.id}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch reports');
+        }
 
-        // Convert to client format
-        const clientReports = reports.map(toClientReport);
-
-        return NextResponse.json({ reports: clientReports });
+        const data = await response.json();
+        return NextResponse.json({ reports: data.reports });
 
     } catch (error) {
         console.error('Error fetching reports:', error);
@@ -66,7 +56,10 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(
+    request: Request,
+    { params }: { params: { id: string } }
+) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
@@ -76,30 +69,21 @@ export async function POST(request: Request) {
             );
         }
 
-        const body: CreateReportBody = await request.json();
-        const {
-            organizationId,
-            type,
-            profit,
-            participants,
-            details,
-            createdBy,
-            createdAt
-        } = body;
+        const body = await request.json();
+        const { type, profit, participants, details } = body;
 
-        if (!organizationId || !type || !profit || !participants || !createdBy) {
+        if (!type || !profit || !participants || participants.length === 0) {
             return NextResponse.json(
                 { error: 'Missing required fields' },
                 { status: 400 }
             );
         }
 
-        const client = await clientPromise;
-        const db = client.db();
+        await dbConnect();
 
         // Check if organization exists and user is a member
         const organization = await Organization.findOne({
-            _id: new ObjectId(organizationId),
+            _id: new ObjectId(params.id),
             $or: [
                 { ownerId: session.user.id },
                 { 'members.discordUserId': session.user.discordId }
@@ -113,24 +97,42 @@ export async function POST(request: Request) {
             );
         }
 
+        // Verify all participants are members
+        const invalidParticipants = participants.filter(
+            (participantId: string) => !organization.members.some((member: OrganizationMember) => member.discordUserId === participantId)
+        );
+
+        if (invalidParticipants.length > 0) {
+            return NextResponse.json(
+                { error: 'Some participants are not members of this organization' },
+                { status: 400 }
+            );
+        }
+
         // Create report
-        const report: Report = {
-            _id: new ObjectId(),
-            organizationId: new ObjectId(organizationId),
+        const reportData: CreateReportBody = {
+            organizationId: params.id,
             type,
             profit,
             participants,
             details,
-            createdBy,
-            createdAt: createdAt ? new Date(createdAt) : new Date()
+            createdBy: session.user.discordId
         };
 
-        await db.collection<Report>('reports').insertOne(report);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(reportData)
+        });
 
-        // Convert to client format
-        const clientReport = toClientReport(report);
+        if (!response.ok) {
+            throw new Error('Failed to create report');
+        }
 
-        return NextResponse.json(clientReport);
+        const data = await response.json();
+        return NextResponse.json(data);
 
     } catch (error) {
         console.error('Error creating report:', error);

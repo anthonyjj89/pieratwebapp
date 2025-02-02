@@ -1,43 +1,33 @@
 "use client";
 
-import { useState, useEffect, ChangeEvent } from 'react';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-interface HitReport {
+interface Report {
     id: string;
-    targetId: string;
-    location: string;
-    totalValue: number;
-    status: 'pending' | 'approved' | 'rejected';
-    timestamp: string;
-    participants: {
-        userId: string;
-        role: string;
-    }[];
-    profitDistribution: {
-        method: 'equal' | 'role' | 'contribution';
-        shares: {
-            userId: string;
-            amount: number;
-            status: 'pending' | 'paid';
-        }[];
-    };
+    createdAt: string;
+    createdBy: string;
+    type: string;
+    profit: number;
+    participants: string[];
 }
 
-type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
-type SortField = 'date' | 'value';
-type SortOrder = 'asc' | 'desc';
-
 export default function ReportsPage() {
-    const { organization, loading, error } = useCurrentOrganization();
-    const [reports, setReports] = useState<HitReport[]>([]);
-    const [loadingReports, setLoadingReports] = useState(true);
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-    const [sortBy, setSortBy] = useState<SortField>('date');
-    const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+    const router = useRouter();
+    const { organization, isLoading } = useCurrentOrganization();
+    const [reports, setReports] = useState<Report[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    const [isLoadingReports, setIsLoadingReports] = useState(true);
 
     useEffect(() => {
-        const fetchReports = async () => {
+        if (!isLoading && !organization) {
+            router.push('/setup');
+        }
+    }, [organization, isLoading, router]);
+
+    useEffect(() => {
+        async function fetchReports() {
             if (!organization) return;
 
             try {
@@ -50,141 +40,104 @@ export default function ReportsPage() {
                 setReports(data.reports);
             } catch (err) {
                 console.error('Error fetching reports:', err);
+                setError(err instanceof Error ? err.message : 'Failed to fetch reports');
             } finally {
-                setLoadingReports(false);
+                setIsLoadingReports(false);
             }
-        };
-
-        if (organization) {
-            fetchReports();
         }
+
+        fetchReports();
     }, [organization]);
 
-    const filteredReports = reports
-        .filter(report => statusFilter === 'all' || report.status === statusFilter)
-        .sort((a, b) => {
-            if (sortBy === 'date') {
-                return sortOrder === 'desc'
-                    ? new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                    : new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-            } else {
-                return sortOrder === 'desc'
-                    ? b.totalValue - a.totalValue
-                    : a.totalValue - b.totalValue;
-            }
-        });
-
-    if (loading || loadingReports) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <p className="text-lg">Loading reports...</p>
+                <p className="text-lg">Loading organization...</p>
             </div>
         );
     }
 
-    if (error || !organization) {
+    if (!organization) {
+        return null; // Will redirect in useEffect
+    }
+
+    if (error) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="p-4 bg-red-500/10 border border-red-500 rounded max-w-md">
-                    <p className="text-lg font-medium">Error</p>
-                    <p className="opacity-75">
-                        {error || 'No organization found. Please join or create an organization.'}
-                    </p>
+            <div className="container mx-auto px-4 py-8">
+                <div className="p-4 bg-red-500/10 border border-red-500 rounded">
+                    <p className="text-red-400">{error}</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Hit Reports</h1>
-                <div className="flex gap-4">
-                    <select
-                        value={statusFilter}
-                        onChange={(e: ChangeEvent<HTMLSelectElement>) => 
-                            setStatusFilter(e.target.value as StatusFilter)
-                        }
-                        className="px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
-                    >
-                        <option value="all">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                    </select>
-                    <select
-                        value={sortBy}
-                        onChange={(e: ChangeEvent<HTMLSelectElement>) => 
-                            setSortBy(e.target.value as SortField)
-                        }
-                        className="px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
-                    >
-                        <option value="date">Sort by Date</option>
-                        <option value="value">Sort by Value</option>
-                    </select>
-                    <button
-                        onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
-                        className="px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
-                    >
-                        {sortOrder === 'asc' ? '↑' : '↓'}
-                    </button>
+        <div className="container mx-auto px-4 py-8">
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold">Reports</h1>
+                <button
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500"
+                    onClick={() => {/* TODO: Open new report modal */}}
+                >
+                    New Report
+                </button>
+            </div>
+
+            {isLoadingReports ? (
+                <div className="flex items-center justify-center min-h-[200px]">
+                    <p className="text-lg">Loading reports...</p>
                 </div>
-            </div>
-
-            <div className="space-y-4">
-                {filteredReports.map((report) => (
-                    <div
-                        key={report.id}
-                        className="p-6 bg-black/20 backdrop-blur-sm rounded"
-                    >
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="font-medium">Target: {report.targetId}</h3>
-                                <p className="text-sm opacity-75">
-                                    Location: {report.location}
-                                </p>
-                                <p className="text-sm opacity-75">
-                                    Date: {new Date(report.timestamp).toLocaleDateString()}
-                                </p>
+            ) : reports.length === 0 ? (
+                <div className="text-center p-12 bg-black/20 backdrop-blur-sm rounded">
+                    <p className="text-lg opacity-75">
+                        No reports found. Create your first report to get started.
+                    </p>
+                </div>
+            ) : (
+                <div className="grid gap-6">
+                    {reports.map((report) => (
+                        <div
+                            key={report.id}
+                            className="p-6 bg-black/20 backdrop-blur-sm rounded border border-white/10"
+                        >
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-xl font-medium">
+                                        {report.type}
+                                    </h3>
+                                    <p className="text-sm opacity-75">
+                                        Created by {report.createdBy} on{' '}
+                                        {new Date(report.createdAt).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xl font-bold">
+                                        {report.profit.toLocaleString()} aUEC
+                                    </p>
+                                    <p className="text-sm opacity-75">
+                                        {report.participants.length} participants
+                                    </p>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <p className="font-medium">
-                                    {report.totalValue.toLocaleString()} aUEC
-                                </p>
-                                <span className={`
-                                    text-sm px-2 py-1 rounded
-                                    ${report.status === 'approved' ? 'bg-green-500/20 text-green-300' : ''}
-                                    ${report.status === 'pending' ? 'bg-yellow-500/20 text-yellow-300' : ''}
-                                    ${report.status === 'rejected' ? 'bg-red-500/20 text-red-300' : ''}
-                                `}>
-                                    {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-                                </span>
+
+                            <div className="flex gap-2">
+                                <button
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500"
+                                    onClick={() => {/* TODO: View report details */}}
+                                >
+                                    View Details
+                                </button>
+                                <button
+                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-500"
+                                    onClick={() => {/* TODO: Delete report */}}
+                                >
+                                    Delete
+                                </button>
                             </div>
                         </div>
-
-                        <div className="border-t border-white/10 pt-4">
-                            <h4 className="text-sm font-medium mb-2">Participants</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                {report.participants.map((participant) => (
-                                    <div
-                                        key={participant.userId}
-                                        className="text-sm bg-black/20 rounded p-2"
-                                    >
-                                        <p className="font-medium">{participant.userId}</p>
-                                        <p className="opacity-75">{participant.role}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {filteredReports.length === 0 && (
-                    <div className="p-4 bg-black/20 backdrop-blur-sm rounded text-center">
-                        <p className="opacity-75">No reports found</p>
-                    </div>
-                )}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

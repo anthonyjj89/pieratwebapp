@@ -1,165 +1,177 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-type ProfitSharingMethod = 'equal' | 'role' | 'contribution';
-
-interface OrganizationSettings {
+interface SettingsForm {
+    name: string;
+    description: string;
     profitSharing: {
-        method: ProfitSharingMethod;
         defaultShare: number;
+        method: 'equal' | 'role' | 'contribution';
     };
 }
 
 export default function SettingsPage() {
-    const { data: session } = useSession();
-    const { organization, loading, error } = useCurrentOrganization();
-    const [saving, setSaving] = useState(false);
-    const [settings, setSettings] = useState<OrganizationSettings>({
-        profitSharing: {
-            method: 'equal',
-            defaultShare: 100
-        }
-    });
+    const router = useRouter();
+    const { organization, role, isLoading, mutate } = useCurrentOrganization();
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Load settings when organization is available
     useEffect(() => {
-        if (organization?.settings) {
-            setSettings(organization.settings);
+        if (!isLoading && !organization) {
+            router.push('/setup');
         }
-    }, [organization]);
+    }, [organization, isLoading, router]);
 
-    const handleSave = async () => {
-        if (!organization || saving) return;
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <p className="text-lg">Loading organization...</p>
+            </div>
+        );
+    }
 
-        setSaving(true);
+    if (!organization) {
+        return null; // Will redirect in useEffect
+    }
+
+    // Only owners can access settings
+    if (role !== 'owner') {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <p className="text-lg text-red-400">
+                    Only organization owners can access settings
+                </p>
+            </div>
+        );
+    }
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setError(null);
+        setIsSaving(true);
+
         try {
-            const response = await fetch(`/api/organizations/${organization.id}/settings`, {
+            const formData = new FormData(e.currentTarget);
+            const data: SettingsForm = {
+                name: formData.get('name') as string,
+                description: formData.get('description') as string,
+                profitSharing: {
+                    defaultShare: Number(formData.get('defaultShare')),
+                    method: formData.get('method') as 'equal' | 'role' | 'contribution'
+                }
+            };
+
+            const response = await fetch(`/api/organizations`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(settings)
+                body: JSON.stringify({
+                    id: organization.id,
+                    ...data
+                })
             });
 
             if (!response.ok) {
-                throw new Error('Failed to update settings');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to update settings');
             }
+
+            await mutate();
         } catch (err) {
-            console.error('Error saving settings:', err);
+            console.error('Error updating settings:', err);
+            setError(err instanceof Error ? err.message : 'Failed to update settings');
         } finally {
-            setSaving(false);
+            setIsSaving(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <p className="text-lg">Loading settings...</p>
-            </div>
-        );
-    }
-
-    if (error || !organization) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="p-4 bg-red-500/10 border border-red-500 rounded max-w-md">
-                    <p className="text-lg font-medium">Error</p>
-                    <p className="opacity-75">
-                        {error || 'No organization found. Please join or create an organization.'}
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    // Only org owner can access settings
-    if (organization.ownerId !== session?.user?.id) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="p-4 bg-red-500/10 border border-red-500 rounded max-w-md">
-                    <p className="text-lg font-medium">Access Denied</p>
-                    <p className="opacity-75">
-                        Only the organization owner can access settings.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-8 max-w-2xl mx-auto">
-            <div>
-                <h1 className="text-2xl font-bold">Organization Settings</h1>
-                <p className="opacity-75">Manage your organization&apos;s settings and preferences.</p>
-            </div>
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-8">Organization Settings</h1>
 
-            <div className="space-y-6">
-                <div className="p-6 bg-black/20 backdrop-blur-sm rounded">
-                    <h2 className="text-lg font-semibold mb-4">Profit Sharing</h2>
-                    
+            {error && (
+                <div className="p-4 bg-red-500/10 border border-red-500 rounded mb-8">
+                    <p className="text-red-400">{error}</p>
+                </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
+                <div>
+                    <label className="block text-sm font-medium mb-2">
+                        Organization Name
+                    </label>
+                    <input
+                        type="text"
+                        name="name"
+                        defaultValue={organization.name}
+                        required
+                        className="w-full px-4 py-2 bg-black/20 rounded border border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium mb-2">
+                        Description
+                    </label>
+                    <textarea
+                        name="description"
+                        defaultValue={organization.description || ''}
+                        rows={3}
+                        className="w-full px-4 py-2 bg-black/20 rounded border border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                </div>
+
+                <div>
+                    <h2 className="text-xl font-semibold mb-4">Profit Sharing</h2>
+
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">
-                                Distribution Method
-                            </label>
-                            <select
-                                value={settings.profitSharing.method}
-                                onChange={(e) => setSettings({
-                                    ...settings,
-                                    profitSharing: {
-                                        ...settings.profitSharing,
-                                        method: e.target.value as ProfitSharingMethod
-                                    }
-                                })}
-                                className="w-full px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
-                            >
-                                <option value="equal">Equal Split</option>
-                                <option value="role">Role-based</option>
-                                <option value="contribution">Contribution-based</option>
-                            </select>
-                            <p className="mt-1 text-sm opacity-75">
-                                {settings.profitSharing.method === 'equal' && 'Split profits equally among all participants'}
-                                {settings.profitSharing.method === 'role' && 'Distribute profits based on member roles'}
-                                {settings.profitSharing.method === 'contribution' && 'Allocate profits based on contribution'}
-                            </p>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium mb-1">
+                            <label className="block text-sm font-medium mb-2">
                                 Default Share (%)
                             </label>
                             <input
                                 type="number"
+                                name="defaultShare"
+                                defaultValue={organization.settings.profitSharing.defaultShare}
                                 min="0"
                                 max="100"
-                                value={settings.profitSharing.defaultShare}
-                                onChange={(e) => setSettings({
-                                    ...settings,
-                                    profitSharing: {
-                                        ...settings.profitSharing,
-                                        defaultShare: parseInt(e.target.value) || 0
-                                    }
-                                })}
-                                className="w-full px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
+                                required
+                                className="w-full px-4 py-2 bg-black/20 rounded border border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             />
-                            <p className="mt-1 text-sm opacity-75">
-                                Default profit share percentage for new members
-                            </p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">
+                                Distribution Method
+                            </label>
+                            <select
+                                name="method"
+                                defaultValue={organization.settings.profitSharing.method}
+                                required
+                                className="w-full px-4 py-2 bg-black/20 rounded border border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            >
+                                <option value="equal">Equal Split</option>
+                                <option value="role">By Role</option>
+                                <option value="contribution">By Contribution</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
-                >
-                    {saving ? 'Saving...' : 'Save Settings'}
-                </button>
-            </div>
+                <div className="pt-4">
+                    <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                </div>
+            </form>
         </div>
     );
 }

@@ -1,10 +1,19 @@
 import 'next-auth';
 import { DefaultSession, DefaultUser } from 'next-auth';
-import { Profile as DiscordProfile } from 'next-auth/providers/discord';
+
+interface DiscordGuild {
+    id: string;
+    name: string;
+    icon: string | null;
+    owner: boolean;
+    permissions: string;
+    features: string[];
+}
 
 declare module 'next-auth' {
     interface Session extends DefaultSession {
         accessToken?: string;
+        discordGuilds?: DiscordGuild[];
         user: {
             id: string;
             discordId: string;
@@ -15,20 +24,18 @@ declare module 'next-auth' {
     }
 
     interface User extends DefaultUser {
-        discordId?: string;
+        discordId: string;
+        discordGuilds?: DiscordGuild[];
     }
 
-    interface Profile extends DiscordProfile {
+    interface Profile {
         id: string;
         username: string;
         discriminator: string;
         avatar: string | null;
         email: string;
         verified: boolean;
-        locale: string;
-        mfa_enabled: boolean;
-        flags: number;
-        premium_type: number;
+        guilds?: DiscordGuild[];
     }
 }
 
@@ -36,6 +43,7 @@ declare module 'next-auth/jwt' {
     interface JWT {
         accessToken?: string;
         discordId?: string;
+        discordGuilds?: DiscordGuild[];
         id?: string;
     }
 }
