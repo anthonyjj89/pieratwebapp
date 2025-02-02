@@ -1,5 +1,5 @@
-import rsiScraper from '../src/services/rsi/scraper';
-import tradeScraper from '../src/services/trade/scraper';
+import rsiScraper from '../src/services/rsi/scraper.js';
+import tradeScraper from '../src/services/trade/scraper.js';
 
 async function main() {
   try {

@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { StatsCard } from '@/components/dashboard';
 import { HitReportForm } from '@/components/reports';
 import { PlayerLookup, CargoLookup } from '@/components/tools';
-import { PriceData } from '@/services/trade/types';
+import { CargoData } from '@/services/trade/types';
 import { RSIProfile } from '@/services/rsi/types';
 
 export default function DashboardPage() {
     const [selectedTarget, setSelectedTarget] = useState<RSIProfile | null>(null);
-    const [selectedCargo, setSelectedCargo] = useState<PriceData | null>(null);
+    const [selectedCargo, setSelectedCargo] = useState<CargoData | null>(null);
 
     return (
         <div className="space-y-8">

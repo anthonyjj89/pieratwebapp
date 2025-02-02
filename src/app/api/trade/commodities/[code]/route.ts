@@ -11,7 +11,16 @@ export async function GET(
 ) {
     try {
         const { code } = await params;
-        const data = await scraper.getCommodityPrices(code);
+        const commodityPrice = await scraper.getCommodityPrices(code);
+
+        // Transform data into CargoData format
+        const data = {
+            code: commodityPrice.code,
+            name: commodityPrice.commodity,
+            avg: commodityPrice.averagePrice,
+            min: Math.min(...commodityPrice.locations.map(loc => loc.price.current)),
+            max: Math.max(...commodityPrice.locations.map(loc => loc.price.current))
+        };
 
         return NextResponse.json({ data });
 

@@ -8,6 +8,10 @@ export interface ErrorResponse {
 }
 
 export class TradeError extends Error {
+    static COMMODITY_NOT_FOUND = 'Commodity not found. Please check the spelling and try again.';
+    static RATE_LIMITED = 'Too many requests. Please try again in a few minutes.';
+    static NETWORK_ERROR = 'Unable to connect to trade website. Please try again later.';
+
     constructor(
         message: string,
         public statusCode?: number
@@ -23,42 +27,63 @@ export class TradeError extends Error {
     }
 }
 
-export interface LocationInventory {
-    current: number;
-    max: number;
-}
-
-export interface PriceInfo {
-    current: number;
-    avg: number;
-    min: number;
-    max: number;
-}
-
 export interface LocationPrice {
     name: string;
     system: string;
     type?: string;
     orbit?: string;
-    isNoQuestions?: boolean;
-    price: PriceInfo;
-    inventory?: LocationInventory;
-    containerSizes?: string[];
+    faction: string;
+    scuBoxSizes: number[];
+    price: {
+        current: number;
+        avg: number;
+        min: number;
+        max: number;
+    };
+    inventory: {
+        current: number;
+        max: number;
+    };
 }
 
-export interface TradeCommodity {
+export interface CommodityPrice {
+    commodity: string;
     code: string;
-    name: string;
-    description?: string;
-    type: string;
-    value: number;
+    bestSellLocation?: {
+        name: string;
+        system: string;
+        price: number;
+    };
+    averagePrice: number;
+    pricePerSCU: number;
     locations: LocationPrice[];
+    lastUpdated: Date;
 }
 
-export interface PriceData extends CommodityPrices {
-    code: string;
-    name: string;
-    type: string;
+export interface TradeRoute {
+    startLocation: string;
+    endLocation: string;
+    commodity: string;
+    profitPerSCU: number;
+    distance: number;
+}
+
+export interface ScrapeOptions {
+    timeout?: number;
+    retries?: number;
+    retryDelay?: number;
+    cacheTime?: number;
+}
+
+export interface RequestConfig {
+    maxRetries: number;
+    minDelay: number;
+    maxDelay: number;
+    userAgents: string[];
+    backoffFactor: number;
+}
+
+export interface PriceData {
     min: number;
     max: number;
     avg: number;
@@ -66,97 +91,10 @@ export interface PriceData extends CommodityPrices {
     locations: LocationPrice[];
 }
 
-export interface TradeLocation {
+export interface CargoData {
     code: string;
     name: string;
-    system: string;
-    type: string;
-    description?: string;
-    orbit?: string;
-    commodities: {
-        code: string;
-        name: string;
-        price: number;
-        inventory?: LocationInventory;
-    }[];
-}
-
-export interface CommoditySearchResult {
-    code: string;
-    name: string;
-    shortName: string;
-    location: string;
-    currentPrice: number;
-}
-
-export interface PriceEntry {
-    commodity: string;
-    buy?: number;
-    sell?: number;
-}
-
-export interface LocationPrices {
-    location: string;
-    system: string;
-    prices: PriceEntry[];
-}
-
-export interface CommodityPrices {
-    commodity: string;
-    locations: {
-        name: string;
-        system: string;
-        buy?: number;
-        sell?: number;
-    }[];
-}
-
-export interface CommodityResponse {
-    error?: string;
-    data?: CommodityPrices;
-}
-
-export interface LocationResponse {
-    error?: string;
-    data?: LocationPrices;
-}
-
-export interface ExtendedLocationResponse {
-    error?: string;
-    data?: {
-        buyPrices: PriceEntry[];
-        sellPrices: PriceEntry[];
-        code: string;
-        name: string;
-        type: string;
-        min: number;
-        max: number;
-        avg: number;
-        median: number;
-        locations: LocationPrice[];
-        commodity: string;
-    };
-}
-
-export function createPriceEntry(
-    name: string,
-    system: string,
-    type?: string,
-    orbit?: string,
-    price?: PriceInfo,
-    inventory?: LocationInventory
-): LocationPrice {
-    return {
-        name,
-        system,
-        type,
-        orbit,
-        price: price || {
-            current: 0,
-            avg: 0,
-            min: 0,
-            max: 0
-        },
-        inventory
-    };
+    avg: number;
+    min: number;
+    max: number;
 }

@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { RSIProfile } from '@/services/rsi/types';
-import { PriceData } from '@/services/trade/types';
+import { CargoData } from '@/services/trade/types';
 
 interface HitReportFormProps {
     target?: RSIProfile | null;
-    cargo?: PriceData | null;
+    cargo?: CargoData | null;
 }
 
 interface HitReport {

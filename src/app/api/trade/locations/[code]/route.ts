@@ -11,17 +11,26 @@ export async function GET(
 ) {
     try {
         const { code } = await params;
-        const location = await scraper.getLocationData(code);
+        const commodityPrice = await scraper.getCommodityPrices(code);
 
-        // Transform location data into expected format
+        // Calculate min, max, avg, and median prices from all locations
+        const prices = commodityPrice.locations.map(loc => loc.price.current);
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        const avg = commodityPrice.averagePrice;
+        const sortedPrices = [...prices].sort((a, b) => a - b);
+        const mid = Math.floor(sortedPrices.length / 2);
+        const median = sortedPrices.length % 2 === 0
+            ? (sortedPrices[mid - 1] + sortedPrices[mid]) / 2
+            : sortedPrices[mid];
+
+        // Transform data into expected format
         const data = {
-            location: location.name,
-            system: location.system,
-            prices: location.commodities.map(commodity => ({
-                commodity: commodity.code,
-                buy: commodity.price,
-                sell: commodity.price
-            }))
+            min,
+            max,
+            avg,
+            median,
+            locations: commodityPrice.locations
         };
 
         return NextResponse.json({ data });

@@ -87,12 +87,22 @@ export default function TradeTool({ onResult }: TradeToolProps) {
                     </div>
 
                     <div className="space-y-4">
-                        {data.locations.map((location: LocationPrice, index) => (
-                            <div key={index} className="p-4 bg-black/20 backdrop-blur-sm rounded">
+                        {data.locations.map((location: LocationPrice, i: number) => (
+                            <div key={i} className="p-4 bg-black/20 backdrop-blur-sm rounded">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <h3 className="text-lg font-semibold">{location.name}</h3>
                                         <p className="text-sm opacity-75">{location.system}</p>
+                                        <div className="flex gap-2 mt-1">
+                                            <span className="text-sm px-2 py-0.5 bg-blue-500/20 rounded">
+                                                {location.faction}
+                                            </span>
+                                            {location.type && (
+                                                <span className="text-sm px-2 py-0.5 bg-gray-500/20 rounded">
+                                                    {location.type}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="text-right">
                                         {location.price && (
@@ -111,11 +121,21 @@ export default function TradeTool({ onResult }: TradeToolProps) {
                                     </div>
                                 </div>
 
-                                {location.type && (
-                                    <p className="text-sm opacity-75">Type: {location.type}</p>
+                                {location.orbit && (
+                                    <p className="text-sm opacity-75 mt-1">Orbit: {location.orbit}</p>
                                 )}
-                                {location.isNoQuestions && (
-                                    <p className="text-sm text-yellow-400">No questions asked</p>
+
+                                {location.scuBoxSizes && location.scuBoxSizes.length > 0 && (
+                                    <div className="mt-2">
+                                        <p className="text-sm opacity-75">SCU Box Sizes:</p>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {location.scuBoxSizes.map((size, i) => (
+                                                <span key={i} className="text-sm px-2 py-0.5 bg-green-500/20 rounded">
+                                                    {size} SCU
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         ))}

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { PriceData } from '@/services/trade/types';
+import { CargoData } from '@/services/trade/types';
 
 interface CargoLookupProps {
-    onSelect?: (data: PriceData) => void;
+    onSelect?: (data: CargoData) => void;
 }
 
 interface Commodity {
@@ -32,8 +32,6 @@ export default function CargoLookup({ onSelect }: CargoLookupProps) {
         setError(null);
 
         try {
-            // Search by full name or short name
-            const termLower = term.toLowerCase();
             const response = await fetch(`/api/trade/commodities/search?q=${encodeURIComponent(term)}`);
             
             if (!response.ok) {
@@ -41,10 +39,7 @@ export default function CargoLookup({ onSelect }: CargoLookupProps) {
             }
 
             const data = await response.json();
-            setResults(data.commodities.filter((commodity: Commodity) => 
-                commodity.name.toLowerCase().includes(termLower) ||
-                commodity.shortName.toLowerCase().includes(termLower)
-            ));
+            setResults(data.results);
         } catch (err) {
             setError('Failed to search commodities');
             console.error('Error searching commodities:', err);
@@ -63,9 +58,15 @@ export default function CargoLookup({ onSelect }: CargoLookupProps) {
                 throw new Error('Failed to fetch price data');
             }
 
-            const data = await response.json();
+            const { data } = await response.json();
             if (onSelect) {
-                onSelect(data);
+                onSelect({
+                    code: commodity.code,
+                    name: commodity.name,
+                    avg: data.avg,
+                    min: data.min,
+                    max: data.max
+                });
             }
         } catch (err) {
             setError('Failed to fetch price data');
