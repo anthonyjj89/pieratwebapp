@@ -1,4 +1,12 @@
-// Error Types
+export interface ErrorResponse {
+    message: string;
+    response?: {
+        status: number;
+        data?: unknown;
+    };
+    code?: string;
+}
+
 export class TradeError extends Error {
     constructor(
         message: string,
@@ -15,113 +23,140 @@ export class TradeError extends Error {
     }
 }
 
-export interface ErrorResponse {
-    message: string;
-    response?: {
-        status: number;
-        data?: unknown;
-    };
-    code?: string;
+export interface LocationInventory {
+    current: number;
+    max: number;
 }
 
-// Price Types
-export interface PriceEntry {
-    commodity: string;
-    price: number;
-    quantity: number;
-    supply?: string;
-    demand?: string;
-    timestamp: string;
+export interface PriceInfo {
+    current: number;
+    avg: number;
+    min: number;
+    max: number;
 }
 
 export interface LocationPrice {
     name: string;
     system: string;
-    orbit?: string;
-    price?: {
-        current: number;
-        avg: number;
-        min?: number;
-        max?: number;
-    };
-    prices: {
-        buy: PriceEntry[];
-        sell: PriceEntry[];
-    };
-    inventory?: {
-        current: number;
-        max: number;
-        avg?: number;
-    };
-    containerSizes?: string[];
     type?: string;
+    orbit?: string;
     isNoQuestions?: boolean;
+    price: PriceInfo;
+    inventory?: LocationInventory;
+    containerSizes?: string[];
 }
 
-// Base Price Data
-export interface BasePriceData {
+export interface TradeCommodity {
     code: string;
     name: string;
-    buy: PriceEntry[];
-    sell: PriceEntry[];
+    description?: string;
+    type: string;
+    value: number;
     locations: LocationPrice[];
+}
+
+export interface PriceData extends CommodityPrices {
+    code: string;
+    name: string;
+    type: string;
     min: number;
     max: number;
     avg: number;
     median: number;
-}
-
-// Trade Types
-export interface TradeCommodity {
-    code: string;
-    name: string;
-    type: string;
-    description?: string;
-    value: string;
-    avgPrice?: number;
+    locations: LocationPrice[];
 }
 
 export interface TradeLocation {
     code: string;
     name: string;
-    type: string;
     system: string;
+    type: string;
     description?: string;
     orbit?: string;
-    faction?: string;
-    price?: {
-        current: number;
+    commodities: {
+        code: string;
+        name: string;
+        price: number;
+        inventory?: LocationInventory;
+    }[];
+}
+
+export interface CommoditySearchResult {
+    code: string;
+    name: string;
+    shortName: string;
+    location: string;
+    currentPrice: number;
+}
+
+export interface PriceEntry {
+    commodity: string;
+    buy?: number;
+    sell?: number;
+}
+
+export interface LocationPrices {
+    location: string;
+    system: string;
+    prices: PriceEntry[];
+}
+
+export interface CommodityPrices {
+    commodity: string;
+    locations: {
+        name: string;
+        system: string;
+        buy?: number;
+        sell?: number;
+    }[];
+}
+
+export interface CommodityResponse {
+    error?: string;
+    data?: CommodityPrices;
+}
+
+export interface LocationResponse {
+    error?: string;
+    data?: LocationPrices;
+}
+
+export interface ExtendedLocationResponse {
+    error?: string;
+    data?: {
+        buyPrices: PriceEntry[];
+        sellPrices: PriceEntry[];
+        code: string;
+        name: string;
+        type: string;
+        min: number;
+        max: number;
         avg: number;
-    };
-    prices?: {
-        buy: PriceEntry[];
-        sell: PriceEntry[];
+        median: number;
+        locations: LocationPrice[];
+        commodity: string;
     };
 }
 
-// API Response Types
-export type LocationPrices = BasePriceData;
-export type CommodityPrices = BasePriceData;
-export type PriceData = BasePriceData;
-
-// Scraper Options
-export interface ScrapeOptions {
-    timeout?: number;
-    retries?: number;
-    retryDelay?: number;
-    cacheTime?: number;
-}
-
-// Helper Functions
 export function createPriceEntry(
-    data: Partial<PriceEntry> & { commodity: string; price: number; quantity: number }
-): PriceEntry {
+    name: string,
+    system: string,
+    type?: string,
+    orbit?: string,
+    price?: PriceInfo,
+    inventory?: LocationInventory
+): LocationPrice {
     return {
-        commodity: data.commodity,
-        price: data.price,
-        quantity: data.quantity,
-        supply: data.supply,
-        demand: data.demand,
-        timestamp: data.timestamp || new Date().toISOString()
+        name,
+        system,
+        type,
+        orbit,
+        price: price || {
+            current: 0,
+            avg: 0,
+            min: 0,
+            max: 0
+        },
+        inventory
     };
 }

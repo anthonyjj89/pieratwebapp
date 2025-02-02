@@ -1,61 +1,32 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
-import { TradeError } from '@/services/trade/types';
-import { LocationRouteHandler } from '@/types/api';
 
-export const GET: LocationRouteHandler = async (request, context) => {
+export async function GET(
+    _request: NextRequest,
+    { params }: { params: { code: string } }
+) {
     try {
-        const { params } = context;
-        const code = Array.isArray(params.code) ? params.code[0] : params.code;
-        if (!code) {
-            return NextResponse.json({ error: 'Location code is required' }, { status: 400 });
-        }
+        const { code } = params;
+        const location = await scraper.getLocationData(code);
 
-        // Get location prices
-        const data = await scraper.getCommodityPrices(code);
-
-        // Format response
-        const buyPrices = data.locations.flatMap(location => 
-            location.prices.buy.map((entry) => ({
-                commodity: entry.commodity,
-                price: entry.price,
-                quantity: entry.quantity,
-                supply: entry.supply,
-                timestamp: entry.timestamp
+        // Transform location data into expected format
+        const data = {
+            location: location.name,
+            system: location.system,
+            prices: location.commodities.map(commodity => ({
+                commodity: commodity.code,
+                buy: commodity.price,
+                sell: commodity.price
             }))
-        );
+        };
 
-        const sellPrices = data.locations.flatMap(location => 
-            location.prices.sell.map((entry) => ({
-                commodity: entry.commodity,
-                price: entry.price,
-                quantity: entry.quantity,
-                demand: entry.demand,
-                timestamp: entry.timestamp
-            }))
-        );
-
-        return NextResponse.json({
-            data: {
-                ...data,
-                buyPrices,
-                sellPrices
-            }
-        });
+        return NextResponse.json({ data });
 
     } catch (error) {
         console.error('Error fetching location prices:', error);
-        
-        if (error instanceof TradeError) {
-            return NextResponse.json(
-                { error: error.message },
-                { status: error.statusCode || 500 }
-            );
-        }
-
         return NextResponse.json(
             { error: 'Failed to fetch location prices' },
             { status: 500 }
         );
     }
-};
+}

@@ -1,13 +1,13 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { TradeCommodity, TradeLocation, PriceData, createPriceEntry, TradeError, ErrorResponse, LocationPrice } from './types';
+import { TradeError, LocationPrice, TradeLocation, ErrorResponse, PriceInfo, CommodityPrices } from './types';
 
 export class TradeScraper {
     private baseUrl: string;
     private headers: Record<string, string>;
 
     constructor() {
-        this.baseUrl = 'https://uexcorp.space';
+        this.baseUrl = 'https://sc-trade.tools';
         this.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         };
@@ -26,37 +26,20 @@ export class TradeScraper {
         }
     }
 
-    private normalizeUrl(url: string | undefined): string | null {
-        if (!url) return null;
+    private normalizeUrl(url: string | undefined): string | undefined {
+        if (!url) return undefined;
         return url.startsWith('http') ? url : `${this.baseUrl}${url}`;
     }
 
-    public async getCommodities(): Promise<TradeCommodity[]> {
+    public async getCommodities(): Promise<string[]> {
         try {
             const html = await this.makeRequest(`${this.baseUrl}/commodities`);
             const $ = cheerio.load(html);
-            const commodities: TradeCommodity[] = [];
 
-            $('.commodity-item').each((_, element) => {
-                const $el = $(element);
-                const code = $el.find('.code').text().trim();
-                const name = $el.find('.name').text().trim();
-                const type = $el.find('.type').text().trim();
-                const description = $el.find('.description').text().trim();
-                const value = $el.find('.value').text().trim();
-                const avgPrice = parseFloat($el.find('.avg-price').text().trim()) || undefined;
-
-                commodities.push({
-                    code,
-                    name,
-                    type,
-                    description,
-                    value,
-                    avgPrice
-                });
-            });
-
-            return commodities;
+            return $('.commodity')
+                .map((_, el) => $(el).attr('data-code'))
+                .get()
+                .filter((code): code is string => code !== undefined);
 
         } catch (error) {
             console.error('Error fetching commodities:', error);
@@ -64,88 +47,18 @@ export class TradeScraper {
         }
     }
 
-    public async getCommodityPrices(code: string): Promise<PriceData> {
+    public async getCommodityPrices(code: string): Promise<CommodityPrices> {
         try {
-            const html = await this.makeRequest(`${this.baseUrl}/commodity/${code}`);
-            const $ = cheerio.load(html);
-
-            const name = $('.commodity-name').text().trim();
-
-            const buyPrices = $('.buy-prices .price-entry').map((_, el) => {
-                const $el = $(el);
-                return createPriceEntry({
-                    commodity: code,
-                    price: parseFloat($el.find('.price').text().trim()),
-                    quantity: parseInt($el.find('.quantity').text().trim(), 10),
-                    supply: $el.find('.supply').text().trim()
-                });
-            }).get();
-
-            const sellPrices = $('.sell-prices .price-entry').map((_, el) => {
-                const $el = $(el);
-                return createPriceEntry({
-                    commodity: code,
-                    price: parseFloat($el.find('.price').text().trim()),
-                    quantity: parseInt($el.find('.quantity').text().trim(), 10),
-                    demand: $el.find('.demand').text().trim()
-                });
-            }).get();
-
-            const locations = $('.location-item').map((_, el) => {
-                const $el = $(el);
-                const name = $el.find('.name').text().trim();
-                const system = $el.find('.system').text().trim();
-                const orbit = $el.find('.orbit').text().trim() || undefined;
-                const type = $el.find('.type').text().trim() || undefined;
-
-                const price = {
-                    current: parseFloat($el.find('.current-price').text().trim()),
-                    avg: parseFloat($el.find('.avg-price').text().trim()),
-                    min: parseFloat($el.find('.min-price').text().trim()),
-                    max: parseFloat($el.find('.max-price').text().trim())
-                };
-
-                const inventory = {
-                    current: parseInt($el.find('.current-inventory').text().trim(), 10),
-                    max: parseInt($el.find('.max-inventory').text().trim(), 10),
-                    avg: parseFloat($el.find('.avg-inventory').text().trim())
-                };
-
-                const containerSizes = $el.find('.container-sizes').text().trim().split(',').map(s => s.trim());
-                const isNoQuestions = $el.hasClass('no-questions');
-
-                return {
-                    name,
-                    system,
-                    orbit,
-                    type,
-                    price,
-                    prices: {
-                        buy: buyPrices.filter(p => p.price > 0),
-                        sell: sellPrices.filter(p => p.price > 0)
-                    },
-                    inventory,
-                    containerSizes,
-                    isNoQuestions
-                } as LocationPrice;
-            }).get();
-
-            const prices = locations.map(l => l.price?.current || 0).filter(p => p > 0);
-            const min = Math.min(...prices);
-            const max = Math.max(...prices);
-            const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-            const median = prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)];
+            const locations = await this.getCommodityData(code);
 
             return {
-                code,
-                name,
-                buy: buyPrices,
-                sell: sellPrices,
-                locations,
-                min,
-                max,
-                avg,
-                median
+                commodity: code,
+                locations: locations.map(loc => ({
+                    name: loc.name,
+                    system: loc.system,
+                    buy: loc.price.current,
+                    sell: loc.price.current
+                }))
             };
 
         } catch (error) {
@@ -154,35 +67,129 @@ export class TradeScraper {
         }
     }
 
-    public async getLocations(): Promise<TradeLocation[]> {
+    public async getCommodityData(code: string): Promise<LocationPrice[]> {
         try {
-            const html = await this.makeRequest(`${this.baseUrl}/locations`);
+            const html = await this.makeRequest(`${this.baseUrl}/commodities/${code}`);
             const $ = cheerio.load(html);
-            const locations: TradeLocation[] = [];
 
-            $('.location-item').each((_, element) => {
-                const $el = $(element);
-                const code = $el.find('.code').text().trim();
-                const name = $el.find('.name').text().trim();
-                const type = $el.find('.type').text().trim();
-                const system = $el.find('.system').text().trim();
-                const description = $el.find('.description').text().trim();
-                const orbit = $el.find('.orbit').text().trim() || undefined;
+            // Parse commodity data
+            const locations: LocationPrice[] = $('.location').map((_, el) => {
+                const $el = $(el);
+                const price: PriceInfo = {
+                    current: parseFloat($el.find('.price-current').text()) || 0,
+                    avg: parseFloat($el.find('.price-avg').text()) || 0,
+                    min: parseFloat($el.find('.price-min').text()) || 0,
+                    max: parseFloat($el.find('.price-max').text()) || 0
+                };
 
-                locations.push({
-                    code,
-                    name,
-                    type,
-                    system,
-                    description,
-                    orbit
-                });
-            });
+                return {
+                    name: $el.find('.name').text().trim(),
+                    system: $el.find('.system').text().trim(),
+                    type: $el.find('.type').text().trim(),
+                    orbit: $el.find('.orbit').text().trim() || undefined,
+                    price,
+                    inventory: {
+                        current: parseInt($el.find('.inventory-current').text()) || 0,
+                        max: parseInt($el.find('.inventory-max').text()) || 0
+                    }
+                };
+            }).get();
 
             return locations;
 
         } catch (error) {
+            console.error('Error fetching commodity data:', error);
+            throw TradeError.fromResponse(error as ErrorResponse);
+        }
+    }
+
+    public async getLocations(): Promise<string[]> {
+        try {
+            const html = await this.makeRequest(`${this.baseUrl}/locations`);
+            const $ = cheerio.load(html);
+
+            return $('.location')
+                .map((_, el) => $(el).attr('data-code'))
+                .get()
+                .filter((code): code is string => code !== undefined);
+
+        } catch (error) {
             console.error('Error fetching locations:', error);
+            throw TradeError.fromResponse(error as ErrorResponse);
+        }
+    }
+
+    public async getLocationData(code: string): Promise<TradeLocation> {
+        try {
+            const html = await this.makeRequest(`${this.baseUrl}/locations/${code}`);
+            const $ = cheerio.load(html);
+
+            // Parse location data
+            const location: TradeLocation = {
+                code,
+                name: $('.location-name').text().trim(),
+                system: $('.location-system').text().trim(),
+                type: $('.location-type').text().trim(),
+                description: $('.location-description').text().trim(),
+                orbit: $('.location-orbit').text().trim() || undefined,
+                commodities: $('.commodity').map((_, el) => {
+                    const $el = $(el);
+                    return {
+                        code: $el.attr('data-code') || '',
+                        name: $el.find('.name').text().trim(),
+                        price: parseFloat($el.find('.price').text()) || 0,
+                        inventory: {
+                            current: parseInt($el.find('.inventory-current').text()) || 0,
+                            max: parseInt($el.find('.inventory-max').text()) || 0
+                        }
+                    };
+                }).get()
+            };
+
+            return location;
+
+        } catch (error) {
+            console.error('Error fetching location data:', error);
+            throw TradeError.fromResponse(error as ErrorResponse);
+        }
+    }
+
+    public async getBestTrades(): Promise<LocationPrice[]> {
+        try {
+            const html = await this.makeRequest(`${this.baseUrl}/best-trades`);
+            const $ = cheerio.load(html);
+
+            // Parse trade data
+            const trades: LocationPrice[] = $('.trade').map((_, el) => {
+                const $el = $(el);
+                const price: PriceInfo = {
+                    current: parseFloat($el.find('.price-current').text()) || 0,
+                    avg: parseFloat($el.find('.price-avg').text()) || 0,
+                    min: parseFloat($el.find('.price-min').text()) || 0,
+                    max: parseFloat($el.find('.price-max').text()) || 0
+                };
+
+                return {
+                    name: $el.find('.name').text().trim(),
+                    system: $el.find('.system').text().trim(),
+                    type: $el.find('.type').text().trim(),
+                    price,
+                    inventory: {
+                        current: parseInt($el.find('.inventory-current').text()) || 0,
+                        max: parseInt($el.find('.inventory-max').text()) || 0
+                    }
+                };
+            }).get();
+
+            // Sort by profit margin
+            return trades.sort((a, b) => {
+                const profitA = a.price.current - a.price.min;
+                const profitB = b.price.current - b.price.min;
+                return profitB - profitA;
+            });
+
+        } catch (error) {
+            console.error('Error fetching best trades:', error);
             throw TradeError.fromResponse(error as ErrorResponse);
         }
     }
