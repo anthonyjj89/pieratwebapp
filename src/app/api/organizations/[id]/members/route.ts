@@ -6,9 +6,13 @@ import { Organization } from '@/models/organization';
 import { authOptions } from '@/lib/auth';
 import { OrganizationMember, toClientMember } from '@/types/organizations';
 
+type Props = {
+    params: Promise<{ id: string }>;
+};
+
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -19,11 +23,12 @@ export async function GET(
             );
         }
 
+        const { id } = await params;
         await dbConnect();
 
         // Check if organization exists
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id)
+            _id: new ObjectId(id)
         });
 
         if (!organization) {
@@ -61,7 +66,7 @@ export async function GET(
 
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -72,6 +77,7 @@ export async function POST(
             );
         }
 
+        const { id } = await params;
         const body = await request.json();
         const { discordUserId, role } = body;
 
@@ -86,7 +92,7 @@ export async function POST(
 
         // Check if organization exists
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id)
+            _id: new ObjectId(id)
         });
 
         if (!organization) {
@@ -142,7 +148,7 @@ export async function POST(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -153,6 +159,7 @@ export async function DELETE(
             );
         }
 
+        const { id } = await params;
         const { searchParams } = new URL(request.url);
         const discordUserId = searchParams.get('discordUserId');
 
@@ -167,7 +174,7 @@ export async function DELETE(
 
         // Check if organization exists
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id)
+            _id: new ObjectId(id)
         });
 
         if (!organization) {
@@ -220,7 +227,7 @@ export async function DELETE(
 
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -231,6 +238,7 @@ export async function PUT(
             );
         }
 
+        const { id } = await params;
         const body = await request.json();
         const { discordUserId, role } = body;
 
@@ -245,7 +253,7 @@ export async function PUT(
 
         // Check if organization exists
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id)
+            _id: new ObjectId(id)
         });
 
         if (!organization) {

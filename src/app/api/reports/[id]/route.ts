@@ -6,9 +6,13 @@ import { Organization } from '@/models/organization';
 import { authOptions } from '@/lib/auth';
 import { Report } from '@/types/reports';
 
+type Props = {
+    params: Promise<{ id: string }>;
+};
+
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -19,13 +23,14 @@ export async function DELETE(
             );
         }
 
+        const { id } = await params;
         const client = await clientPromise;
         const db = client.db();
 
         // Get report
         const report = await db
             .collection<Report>('reports')
-            .findOne({ _id: new ObjectId(params.id) });
+            .findOne({ _id: new ObjectId(id) });
 
         if (!report) {
             return NextResponse.json(
@@ -53,7 +58,7 @@ export async function DELETE(
         // Delete report
         await db
             .collection<Report>('reports')
-            .deleteOne({ _id: new ObjectId(params.id) });
+            .deleteOne({ _id: new ObjectId(id) });
 
         return NextResponse.json({
             message: 'Report deleted successfully'

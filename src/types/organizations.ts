@@ -28,6 +28,18 @@ export interface Organization {
     updatedAt: Date;
 }
 
+export interface CreateOrganizationInput {
+    name: string;
+    description?: string;
+    discordGuildId: string;
+    settings: {
+        profitSharing: {
+            defaultShare: number;
+            method: 'equal';
+        };
+    };
+}
+
 export interface JoinRequestStatus {
     _id: ObjectId;
     organizationId: ObjectId;

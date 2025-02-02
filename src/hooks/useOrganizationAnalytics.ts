@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { AnalyticsResponse } from '@/types/analytics';
 
@@ -15,7 +15,7 @@ export function useOrganizationAnalytics(organizationId: string | null): UseOrga
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    async function fetchAnalytics() {
+    const fetchAnalytics = useCallback(async () => {
         if (!organizationId) return;
 
         try {
@@ -37,7 +37,7 @@ export function useOrganizationAnalytics(organizationId: string | null): UseOrga
         } finally {
             setIsLoading(false);
         }
-    }
+    }, [organizationId]);
 
     useEffect(() => {
         if (session?.user && organizationId) {
@@ -46,7 +46,7 @@ export function useOrganizationAnalytics(organizationId: string | null): UseOrga
             setAnalytics(null);
             setIsLoading(false);
         }
-    }, [session, organizationId]);
+    }, [session, organizationId, fetchAnalytics]);
 
     const mutate = async () => {
         await fetchAnalytics();

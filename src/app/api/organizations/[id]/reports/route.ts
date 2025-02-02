@@ -7,9 +7,13 @@ import { authOptions } from '@/lib/auth';
 import { CreateReportBody } from '@/types/reports';
 import { OrganizationMember } from '@/types/organizations';
 
+type Props = {
+    params: Promise<{ id: string }>;
+};
+
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -20,11 +24,12 @@ export async function GET(
             );
         }
 
+        const { id } = await params;
         await dbConnect();
 
         // Check if organization exists and user is a member
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id),
+            _id: new ObjectId(id),
             $or: [
                 { ownerId: session.user.id },
                 { 'members.discordUserId': session.user.discordId }
@@ -39,7 +44,7 @@ export async function GET(
         }
 
         // Get reports for this organization
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports?organizationId=${params.id}`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports?organizationId=${id}`);
         if (!response.ok) {
             throw new Error('Failed to fetch reports');
         }
@@ -58,7 +63,7 @@ export async function GET(
 
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -69,6 +74,7 @@ export async function POST(
             );
         }
 
+        const { id } = await params;
         const body = await request.json();
         const { type, profit, participants, details } = body;
 
@@ -83,7 +89,7 @@ export async function POST(
 
         // Check if organization exists and user is a member
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id),
+            _id: new ObjectId(id),
             $or: [
                 { ownerId: session.user.id },
                 { 'members.discordUserId': session.user.discordId }
@@ -111,7 +117,7 @@ export async function POST(
 
         // Create report
         const reportData: CreateReportBody = {
-            organizationId: params.id,
+            organizationId: id,
             type,
             profit,
             participants,

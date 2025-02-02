@@ -4,9 +4,13 @@ import dbConnect from '@/lib/db';
 import { Organization } from '@/models/organization';
 import { authOptions } from '@/lib/auth';
 
+type Props = {
+    params: Promise<{ guildId: string }>;
+};
+
 export async function GET(
     request: Request,
-    { params }: { params: { guildId: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -17,11 +21,12 @@ export async function GET(
             );
         }
 
+        const { guildId } = await params;
         await dbConnect();
 
         // Check if organization exists for this guild
         const organization = await Organization.findOne({
-            discordGuildId: params.guildId
+            discordGuildId: guildId
         });
 
         if (!organization) {

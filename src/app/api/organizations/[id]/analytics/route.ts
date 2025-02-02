@@ -8,9 +8,13 @@ import { Report } from '@/types/reports';
 import { OrganizationMember } from '@/types/organizations';
 import { AnalyticsData, toAnalyticsResponse } from '@/types/analytics';
 
+type Props = {
+    params: Promise<{ id: string }>;
+};
+
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -21,12 +25,13 @@ export async function GET(
             );
         }
 
+        const { id } = await params;
         const client = await clientPromise;
         const db = client.db();
 
         // Check if organization exists and user is a member
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id),
+            _id: new ObjectId(id),
             $or: [
                 { ownerId: session.user.id },
                 { 'members.discordUserId': session.user.discordId }
@@ -46,7 +51,7 @@ export async function GET(
         // Get reports data
         const reports = await db
             .collection<Report>('reports')
-            .find({ organizationId: new ObjectId(params.id) })
+            .find({ organizationId: new ObjectId(id) })
             .toArray();
 
         const totalReports = reports.length;

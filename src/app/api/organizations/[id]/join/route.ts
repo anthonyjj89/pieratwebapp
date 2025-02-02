@@ -5,9 +5,13 @@ import dbConnect from '@/lib/db';
 import { Organization, JoinRequest } from '@/models/organization';
 import { authOptions } from '@/lib/auth';
 
+type Props = {
+    params: Promise<{ id: string }>;
+};
+
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -18,11 +22,12 @@ export async function POST(
             );
         }
 
+        const { id } = await params;
         await dbConnect();
 
         // Check if organization exists
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id)
+            _id: new ObjectId(id)
         });
 
         if (!organization) {
@@ -74,7 +79,7 @@ export async function POST(
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -85,11 +90,12 @@ export async function GET(
             );
         }
 
+        const { id } = await params;
         await dbConnect();
 
         // Check if organization exists
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id)
+            _id: new ObjectId(id)
         });
 
         if (!organization) {
@@ -126,7 +132,7 @@ export async function GET(
 
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: Props
 ) {
     try {
         const session = await getServerSession(authOptions);
@@ -137,6 +143,7 @@ export async function PUT(
             );
         }
 
+        const { id } = await params;
         const body = await request.json();
         const { requestId, status, message } = body;
 
@@ -151,7 +158,7 @@ export async function PUT(
 
         // Check if organization exists
         const organization = await Organization.findOne({
-            _id: new ObjectId(params.id)
+            _id: new ObjectId(id)
         });
 
         if (!organization) {
