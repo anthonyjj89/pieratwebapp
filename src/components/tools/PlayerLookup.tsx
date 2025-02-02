@@ -2,16 +2,16 @@
 
 import { useState } from 'react';
 import { RSIProfile } from '@/services/rsi/types';
-import scraper from '@/services/rsi/scraper';
 
-interface Props {
-    onResult?: (profile: RSIProfile) => void;
+interface PlayerLookupProps {
+    onResult?: (data: RSIProfile) => void;
 }
 
-export default function PlayerLookup({ onResult }: Props) {
+export default function PlayerLookup({ onResult }: PlayerLookupProps) {
     const [handle, setHandle] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [profile, setProfile] = useState<RSIProfile | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -19,11 +19,19 @@ export default function PlayerLookup({ onResult }: Props) {
 
         setLoading(true);
         setError(null);
+        setProfile(null);
 
         try {
-            const profile = await scraper.getProfileData(handle);
+            const response = await fetch(`/api/players/${encodeURIComponent(handle)}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch player data');
+            }
+
+            setProfile(data);
             if (onResult) {
-                onResult(profile);
+                onResult(data);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch player data');
@@ -33,37 +41,92 @@ export default function PlayerLookup({ onResult }: Props) {
     };
 
     return (
-        <div className="w-full max-w-md">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label htmlFor="handle" className="block text-sm font-medium text-gray-200">
-                        Player Handle
-                    </label>
-                    <input
-                        type="text"
-                        id="handle"
-                        value={handle}
-                        onChange={(e) => setHandle(e.target.value)}
-                        className="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        placeholder="Enter RSI handle"
-                        disabled={loading}
-                    />
-                </div>
-
-                {error && (
-                    <div className="text-red-500 text-sm">
-                        {error}
-                    </div>
-                )}
-
+        <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="flex gap-2">
+                <input
+                    type="text"
+                    value={handle}
+                    onChange={(e) => setHandle(e.target.value)}
+                    placeholder="Enter RSI handle"
+                    className="flex-1 px-3 py-2 border rounded bg-black/20 backdrop-blur-sm"
+                />
                 <button
                     type="submit"
                     disabled={loading || !handle}
-                    className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
                 >
-                    {loading ? 'Loading...' : 'Lookup Player'}
+                    {loading ? 'Loading...' : 'Search'}
                 </button>
             </form>
+
+            {error && (
+                <div className="p-4 bg-red-500/10 border border-red-500 rounded">
+                    {error}
+                </div>
+            )}
+
+            {profile && (
+                <div className="space-y-4 p-4 bg-black/20 backdrop-blur-sm rounded">
+                    <div className="flex items-start gap-4">
+                        {profile.avatarUrl && (
+                            <img
+                                src={profile.avatarUrl}
+                                alt={`${profile.handle}'s avatar`}
+                                className="w-20 h-20 rounded"
+                            />
+                        )}
+                        <div>
+                            <h3 className="text-xl font-bold">{profile.handle}</h3>
+                            <p className="text-sm opacity-75">Enlisted: {profile.enlisted}</p>
+                            {profile.location && (
+                                <p className="text-sm opacity-75">Location: {profile.location}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {profile.mainOrg && (
+                        <div className="pt-4 border-t border-white/10">
+                            <h4 className="font-semibold mb-2">Main Organization</h4>
+                            <div className="flex items-center gap-3">
+                                {profile.mainOrg.logoUrl && (
+                                    <img
+                                        src={profile.mainOrg.logoUrl}
+                                        alt={`${profile.mainOrg.name} logo`}
+                                        className="w-12 h-12 rounded"
+                                    />
+                                )}
+                                <div>
+                                    <p className="font-medium">{profile.mainOrg.name}</p>
+                                    <p className="text-sm opacity-75">Rank: {profile.mainOrg.rank}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {profile.affiliatedOrgs.length > 0 && (
+                        <div className="pt-4 border-t border-white/10">
+                            <h4 className="font-semibold mb-2">Affiliated Organizations</h4>
+                            <div className="space-y-3">
+                                {profile.affiliatedOrgs.map((org, index) => (
+                                    <div key={index} className="flex items-center gap-3">
+                                        {org.logoUrl && (
+                                            <img
+                                                src={org.logoUrl}
+                                                alt={`${org.name} logo`}
+                                                className="w-8 h-8 rounded"
+                                            />
+                                        )}
+                                        <div>
+                                            <p className="font-medium">{org.name}</p>
+                                            <p className="text-sm opacity-75">Rank: {org.rank}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
