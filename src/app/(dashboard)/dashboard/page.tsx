@@ -6,10 +6,33 @@ import { HitReportForm } from '@/components/reports';
 import { PlayerLookup, CargoLookup } from '@/components/tools';
 import { CargoData } from '@/services/trade/types';
 import { RSIProfile } from '@/services/rsi/types';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export default function DashboardPage() {
     const [selectedTarget, setSelectedTarget] = useState<RSIProfile | null>(null);
     const [selectedCargo, setSelectedCargo] = useState<CargoData | null>(null);
+    const { organization, loading, error } = useCurrentOrganization();
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <p className="text-lg">Loading organization...</p>
+            </div>
+        );
+    }
+
+    if (error || !organization) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="p-4 bg-red-500/10 border border-red-500 rounded max-w-md">
+                    <p className="text-lg font-medium">Error</p>
+                    <p className="opacity-75">
+                        {error || 'No organization found. Please join or create an organization.'}
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">
@@ -37,7 +60,11 @@ export default function DashboardPage() {
                 {/* Hit Report Form */}
                 <div className="col-span-2 space-y-4">
                     <h2 className="text-2xl font-bold">Submit Hit Report</h2>
-                    <HitReportForm target={selectedTarget} cargo={selectedCargo} />
+                    <HitReportForm 
+                        target={selectedTarget} 
+                        cargo={selectedCargo} 
+                        organizationId={organization.id}
+                    />
                 </div>
 
                 {/* Tools */}

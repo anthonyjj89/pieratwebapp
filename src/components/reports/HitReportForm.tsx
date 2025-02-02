@@ -3,32 +3,60 @@
 import { useState } from 'react';
 import { RSIProfile } from '@/services/rsi/types';
 import { CargoData } from '@/services/trade/types';
+import { OrganizationMember } from '@/types/organizations';
+import CrewSelector from './CrewSelector';
 
 interface HitReportFormProps {
     target?: RSIProfile | null;
     cargo?: CargoData | null;
+    organizationId: string;
+}
+
+interface CargoEntry {
+    code: string;
+    name: string;
+    quantity: number;
+    value: number;
 }
 
 interface HitReport {
     targetId: string;
+    organizationId: string;
     location: string;
-    cargo: {
-        code: string;
-        quantity: number;
-        value: number;
-    }[];
+    cargo: CargoEntry[];
+    participants: OrganizationMember[];
     timestamp: Date;
 }
 
-export default function HitReportForm({ target, cargo }: HitReportFormProps) {
+export default function HitReportForm({ target, cargo, organizationId }: HitReportFormProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [location, setLocation] = useState('');
-    const [quantity, setQuantity] = useState<number>(0);
+    const [cargoEntries, setCargoEntries] = useState<CargoEntry[]>([]);
+    const [selectedCrew, setSelectedCrew] = useState<OrganizationMember[]>([]);
+    const [currentQuantity, setCurrentQuantity] = useState<number>(0);
+
+    const addCargoEntry = () => {
+        if (!cargo || currentQuantity <= 0) return;
+
+        const newEntry: CargoEntry = {
+            code: cargo.code,
+            name: cargo.name,
+            quantity: currentQuantity,
+            value: cargo.avg * currentQuantity
+        };
+
+        setCargoEntries([...cargoEntries, newEntry]);
+        setCurrentQuantity(0);
+    };
+
+    const removeCargoEntry = (index: number) => {
+        setCargoEntries(cargoEntries.filter((_, i) => i !== index));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!target || !cargo || !location || quantity <= 0) return;
+        if (!target || cargoEntries.length === 0 || !location || selectedCrew.length === 0) return;
 
         setLoading(true);
         setError(null);
@@ -36,21 +64,30 @@ export default function HitReportForm({ target, cargo }: HitReportFormProps) {
         try {
             const report: HitReport = {
                 targetId: target.id,
+                organizationId,
                 location,
-                cargo: [{
-                    code: cargo.code,
-                    quantity,
-                    value: cargo.avg * quantity
-                }],
+                cargo: cargoEntries,
+                participants: selectedCrew,
                 timestamp: new Date()
             };
 
-            // TODO: Submit to API
-            console.log('Submitting report:', report);
+            const response = await fetch('/api/reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(report),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to submit report');
+            }
 
             // Clear form
             setLocation('');
-            setQuantity(0);
+            setCargoEntries([]);
+            setCurrentQuantity(0);
+            setSelectedCrew([]);
 
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to submit report');
@@ -87,28 +124,59 @@ export default function HitReportForm({ target, cargo }: HitReportFormProps) {
                 </div>
             )}
 
-            {/* Cargo Info */}
-            {cargo ? (
+            {/* Cargo List */}
+            <div className="space-y-4">
+                <h3 className="font-semibold">Cargo List</h3>
+                {cargoEntries.map((entry, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-black/20 rounded">
+                        <div>
+                            <p className="font-medium">{entry.name}</p>
+                            <p className="text-sm opacity-75">Quantity: {entry.quantity}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-medium">{entry.value.toLocaleString()} aUEC</p>
+                            <button
+                                onClick={() => removeCargoEntry(index)}
+                                className="text-sm text-red-400 hover:text-red-300"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Current Cargo Selection */}
+            {cargo && (
                 <div className="p-4 bg-black/20 backdrop-blur-sm rounded">
-                    <h3 className="font-semibold mb-2">Selected Cargo</h3>
-                    <div className="flex justify-between">
+                    <h3 className="font-semibold mb-2">Add Cargo</h3>
+                    <div className="flex justify-between items-end">
                         <div>
                             <p className="font-medium">{cargo.name}</p>
                             <p className="text-sm opacity-75">
                                 Average Price: {cargo.avg.toLocaleString()} aUEC
                             </p>
                         </div>
-                        <div className="text-right">
-                            <p className="font-medium">
-                                {(cargo.avg * (quantity || 0)).toLocaleString()} aUEC
-                            </p>
-                            <p className="text-sm opacity-75">Total Value</p>
+                        <div className="flex items-end gap-2">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Quantity</label>
+                                <input
+                                    type="number"
+                                    value={currentQuantity || ''}
+                                    onChange={(e) => setCurrentQuantity(parseInt(e.target.value) || 0)}
+                                    min="1"
+                                    className="w-24 px-2 py-1 bg-black/20 backdrop-blur-sm border rounded"
+                                />
+                            </div>
+                            <button
+                                onClick={addCargoEntry}
+                                disabled={!cargo || currentQuantity <= 0}
+                                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
+                            >
+                                Add
+                            </button>
                         </div>
                     </div>
-                </div>
-            ) : (
-                <div className="p-4 bg-black/20 backdrop-blur-sm rounded">
-                    <p className="text-center opacity-75">No cargo selected</p>
                 </div>
             )}
 
@@ -126,17 +194,11 @@ export default function HitReportForm({ target, cargo }: HitReportFormProps) {
                     />
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium mb-1">Quantity</label>
-                    <input
-                        type="number"
-                        value={quantity || ''}
-                        onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
-                        min="1"
-                        className="w-full px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
-                        required
-                    />
-                </div>
+                {/* Crew Selection */}
+                <CrewSelector
+                    organizationId={organizationId}
+                    onSelect={setSelectedCrew}
+                />
 
                 {error && (
                     <div className="p-4 bg-red-500/10 border border-red-500 rounded">
@@ -146,7 +208,7 @@ export default function HitReportForm({ target, cargo }: HitReportFormProps) {
 
                 <button
                     type="submit"
-                    disabled={loading || !target || !cargo || !location || quantity <= 0}
+                    disabled={loading || !target || cargoEntries.length === 0 || !location || selectedCrew.length === 0}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50"
                 >
                     {loading ? 'Submitting...' : 'Submit Report'}
