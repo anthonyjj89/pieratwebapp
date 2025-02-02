@@ -4,10 +4,10 @@ import { RSIError } from '@/services/rsi/types';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { handle: string } }
+    { params }: { params: { handle: string | string[] } }
 ) {
     try {
-        const { handle } = params;
+        const handle = Array.isArray(params.handle) ? params.handle[0] : params.handle;
         if (!handle) {
             return NextResponse.json({ error: 'Handle is required' }, { status: 400 });
         }

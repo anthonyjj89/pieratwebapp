@@ -4,10 +4,10 @@ import { TradeError } from '@/services/trade/types';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { code: string } }
+    { params }: { params: { code: string | string[] } }
 ) {
     try {
-        const { code } = params;
+        const code = Array.isArray(params.code) ? params.code[0] : params.code;
         if (!code) {
             return NextResponse.json({ error: 'Commodity code is required' }, { status: 400 });
         }
