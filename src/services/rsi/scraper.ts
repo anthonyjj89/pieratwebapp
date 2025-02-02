@@ -3,7 +3,11 @@ import * as cheerio from 'cheerio';
 import type { Organization, RSIProfile, ScrapeOptions, ErrorResponse } from './types';
 import { RSIError } from './types';
 
-class RSIScraper {
+/**
+ * RSI Profile Scraper
+ * Scrapes player profiles and organization data from the RSI website
+ */
+export class RSIScraper {
     private baseUrl: string;
     private headers: Record<string, string>;
     private options: Required<ScrapeOptions>;
@@ -192,7 +196,6 @@ class RSIScraper {
     }
 }
 
-// Create a singleton instance
+// Create and export a singleton instance
 const scraper = new RSIScraper();
-export type { RSIScraper };  // Export type only
-export default scraper;      // Export instance as default
+export default scraper;

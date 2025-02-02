@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
 import { TradeError } from '@/services/trade/types';
 
-type RouteParams = { params: { code: string } };
-
 export async function GET(
-    _request: NextRequest,
-    { params }: RouteParams
+    request: NextRequest,
+    { params }: { params: { code: string } }
 ) {
     try {
         const { code } = params;

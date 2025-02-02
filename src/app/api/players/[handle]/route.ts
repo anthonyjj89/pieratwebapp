@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/rsi/scraper';
 import { RSIError } from '@/services/rsi/types';
 
-type RouteParams = { params: { handle: string } };
-
 export async function GET(
-    _request: NextRequest,
-    { params }: RouteParams
+    request: NextRequest,
+    { params }: { params: { handle: string } }
 ) {
     try {
         const { handle } = params;
