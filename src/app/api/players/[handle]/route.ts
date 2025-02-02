@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/rsi/scraper';
 import { RSIError } from '@/services/rsi/types';
 
+type RouteParams = { params: { handle: string } };
+
 export async function GET(
-    request: NextRequest,
-    context: { params: { handle: string } }
+    _request: NextRequest,
+    { params }: RouteParams
 ) {
     try {
-        const handle = context.params.handle;
+        const { handle } = params;
         if (!handle) {
             return NextResponse.json({ error: 'Handle is required' }, { status: 400 });
         }

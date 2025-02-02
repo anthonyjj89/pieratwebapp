@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import scraper from '@/services/trade/scraper';
 import { TradeError } from '@/services/trade/types';
 
+type RouteParams = { params: { code: string } };
+
 export async function GET(
-    request: NextRequest,
-    context: { params: { code: string } }
+    _request: NextRequest,
+    { params }: RouteParams
 ) {
     try {
-        const code = context.params.code;
+        const { code } = params;
         if (!code) {
             return NextResponse.json({ error: 'Commodity code is required' }, { status: 400 });
         }
