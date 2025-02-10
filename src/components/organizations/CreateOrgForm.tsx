@@ -21,6 +21,9 @@ export default function CreateOrgForm({ onSubmit }: CreateOrgFormProps) {
     const [selectedGuild, setSelectedGuild] = useState<string>('');
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [roles, setRoles] = useState<{ [roleName: string]: { ratio: number } }>({
+        'general': { ratio: 1.0 }
+    });
 
     // Fetch available Discord servers
     const fetchGuilds = async () => {
@@ -54,6 +57,7 @@ export default function CreateOrgForm({ onSubmit }: CreateOrgFormProps) {
                 name,
                 description,
                 discordGuildId: selectedGuild,
+                roles: roles,
                 settings: {
                     profitSharing: {
                         defaultShare: 100,
@@ -107,6 +111,27 @@ export default function CreateOrgForm({ onSubmit }: CreateOrgFormProps) {
                     placeholder="Enter organization description"
                     className="w-full h-24 px-3 py-2 bg-black/20 backdrop-blur-sm border rounded resize-none"
                 />
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium mb-1">Roles</label>
+                {Object.entries(roles).map(([roleName, role]) => (
+                    <div key={roleName} className="flex items-center space-x-2">
+                        <label className="text-sm font-medium">{roleName}</label>
+                        <input
+                            type="number"
+                            value={role.ratio}
+                            onChange={(e) => {
+                                const newRatio = parseFloat(e.target.value);
+                                setRoles({
+                                    ...roles,
+                                    [roleName]: { ratio: newRatio },
+                                });
+                            }}
+                            className="w-20 px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
+                        />
+                    </div>
+                ))}
             </div>
 
             {error && (

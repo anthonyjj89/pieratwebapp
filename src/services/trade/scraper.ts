@@ -63,16 +63,25 @@ export class TradeScraper {
     return [];
   }
 
-  public async getCommodities(): Promise<string[]> {
+  public async getCommodities(): Promise<{ code: string; name: string }[]> {
     try {
       const html = await this.makeRequest(`${this.baseUrl}/commodities`);
       const $ = cheerio.load(html);
 
       // Get all commodity codes from the grid
       const commodities = $('.commodities-bar .label-commodity')
-        .map((_, el) => $(el).attr('slug'))
+        .map((_, el) => {
+          const code = $(el).attr('slug');
+          const name = $(el).text().trim();
+
+          if (typeof code === 'string') {
+            return { code, name };
+          }
+
+          return null;
+        })
         .get()
-        .filter((code: unknown): code is string => typeof code === 'string');
+        .filter((commodity: unknown): commodity is { code: string; name: string } => commodity !== null);
 
       return commodities;
     } catch (error) {

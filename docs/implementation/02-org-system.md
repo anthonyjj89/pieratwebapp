@@ -1,7 +1,7 @@
 # Organization System Implementation
 
 ## Overview
-This guide details the implementation of the organization system, including creation by Discord admins, member management, and role permissions.
+This guide details the implementation of the organization system, including creation by Discord admins, member management, role permissions, and analytics.
 
 ## Prerequisites
 - Authentication system from [01-auth-setup.md](./01-auth-setup.md) must be implemented
@@ -11,45 +11,69 @@ This guide details the implementation of the organization system, including crea
 ## Steps
 
 ### 1. Database Schema
-Create `src/models/Organization.ts`:
+Create `src/types/organizations.ts`:
 ```typescript
 import { ObjectId } from 'mongodb';
 
-export interface Organization {
-  _id: ObjectId;
-  name: string;
-  discordServerId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  ownerId: string; // Discord user ID of creator
-  settings: {
-    allowJoinRequests: boolean;
-    autoApproveMembers: boolean;
-    defaultRole: string;
-  };
-  roles: {
-    name: string;
-    permissions: string[];
-  }[];
-}
-
 export interface OrganizationMember {
-  _id: ObjectId;
-  organizationId: ObjectId;
-  userId: string; // Discord user ID
-  roles: string[];
-  joinedAt: Date;
-  status: 'pending' | 'active' | 'inactive';
+    userId: string; // For backward compatibility
+    discordUserId: string;
+    role: string; // Use custom roles defined by the organization
+    joinedAt: Date;
+    settings?: {
+        profitShare?: number;
+    };
 }
 
-export interface JoinRequest {
-  _id: ObjectId;
-  organizationId: ObjectId;
-  userId: string; // Discord user ID
-  requestedAt: Date;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewedBy?: string;
-  reviewedAt?: Date;
+export interface Organization {
+    _id: ObjectId;
+    id: string; // For client-side use
+    name: string;
+    description?: string;
+    discordGuildId: string;
+    ownerId: string;
+    members: OrganizationMember[];
+    roles: { // Define custom roles with profit sharing ratios
+        [roleName: string]: {
+            ratio: number;
+        };
+    };
+    settings: {
+        profitSharing: {
+            defaultShare: number;
+            method: 'equal' | 'role' | 'contribution';
+        };
+    };
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface CreateOrganizationInput {
+    name: string;
+    description?: string;
+    discordGuildId: string;
+    roles: { // Define custom roles with profit sharing ratios
+        [roleName: string]: {
+            ratio: number;
+        };
+    };
+    settings: {
+        profitSharing: {
+            defaultShare: number;
+            method: 'equal';
+        };
+    };
+}
+
+export interface JoinRequestStatus {
+    _id: ObjectId;
+    organizationId: ObjectId;
+    discordUserId: string;
+    status: 'pending' | 'approved' | 'rejected';
+    requestedAt: Date;
+    respondedAt?: Date;
+    respondedBy?: string;
+    message?: string;
 }
 ```
 
@@ -57,321 +81,220 @@ export interface JoinRequest {
 Create `src/lib/discord.ts`:
 ```typescript
 interface DiscordGuild {
-  id: string;
-  name: string;
-  owner: boolean;
-  permissions: string;
+    id: string;
+    name: string;
+    owner: boolean;
+    permissions: string;
 }
 
 export async function getUserGuilds(accessToken: string): Promise<DiscordGuild[]> {
-  const response = await fetch('https://discord.com/api/users/@me/guilds', {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-  return response.json();
+    const response = await fetch('https://discord.com/api/users/@me/guilds', {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+        },
+    });
+    return response.json();
 }
 
 export function isGuildAdmin(guild: DiscordGuild): boolean {
-  const ADMINISTRATOR = 0x8;
-  const permissions = BigInt(guild.permissions);
-  return guild.owner || (permissions & BigInt(ADMINISTRATOR)) === BigInt(ADMINISTRATOR);
+    const ADMINISTRATOR = 0x8;
+    const permissions = BigInt(guild.permissions);
+    return guild.owner || (permissions & BigInt(ADMINISTRATOR)) === BigInt(ADMINISTRATOR);
 }
 
 export async function getAdminGuilds(accessToken: string): Promise<DiscordGuild[]> {
-  const guilds = await getUserGuilds(accessToken);
-  return guilds.filter(isGuildAdmin);
+    const guilds = await getUserGuilds(accessToken);
+    return guilds.filter(isGuildAdmin);
 }
 ```
 
 ### 3. Organization Creation API
 Create `src/app/api/organizations/route.ts`:
 ```typescript
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { getAdminGuilds } from '@/lib/discord';
-import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { CreateOrganizationInput } from '@/types/organizations';
 
-export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.accessToken) {
-    return new Response('Unauthorized', { status: 401 });
-  }
+export async function POST(request: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session?.accessToken) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const { name, discordServerId } = await req.json();
+    const input: CreateOrganizationInput = await request.json();
 
-  // Verify user is admin of the server
-  const adminGuilds = await getAdminGuilds(session.accessToken);
-  const isAdmin = adminGuilds.some(guild => guild.id === discordServerId);
-  
-  if (!isAdmin) {
-    return new Response('Not a server admin', { status: 403 });
-  }
+    // Verify user is admin of the server
+    const adminGuilds = await getAdminGuilds(session.accessToken);
+    const isAdmin = adminGuilds.some(guild => guild.id === input.discordGuildId);
+    
+    if (!isAdmin) {
+        return NextResponse.json({ error: 'Not a server admin' }, { status: 403 });
+    }
 
-  const client = await clientPromise;
-  const db = client.db();
+    const organization = {
+        _id: new ObjectId(),
+        ...input,
+        ownerId: session.user.id,
+        members: [{
+            discordUserId: session.user.id,
+            role: 'owner',
+            joinedAt: new Date()
+        }],
+        createdAt: new Date(),
+        updatedAt: new Date()
+    };
 
-  // Check if org already exists for this server
-  const existing = await db.collection('organizations').findOne({ discordServerId });
-  if (existing) {
-    return new Response('Organization already exists for this server', { status: 400 });
-  }
+    await db.collection('organizations').insertOne(organization);
 
-  // Create organization
-  const org = {
-    _id: new ObjectId(),
-    name,
-    discordServerId,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ownerId: session.user.id,
-    settings: {
-      allowJoinRequests: true,
-      autoApproveMembers: false,
-      defaultRole: 'member',
-    },
-    roles: [
-      {
-        name: 'admin',
-        permissions: ['manage_org', 'manage_members', 'manage_roles'],
-      },
-      {
-        name: 'member',
-        permissions: ['view_reports', 'create_reports'],
-      },
-    ],
-  };
-
-  await db.collection('organizations').insertOne(org);
-
-  // Add creator as admin member
-  await db.collection('organization_members').insertOne({
-    organizationId: org._id,
-    userId: session.user.id,
-    roles: ['admin'],
-    joinedAt: new Date(),
-    status: 'active',
-  });
-
-  return new Response(JSON.stringify(org), {
-    status: 201,
-    headers: { 'Content-Type': 'application/json' },
-  });
+    return NextResponse.json(organization);
 }
 ```
 
-### 4. Join Request System
-Create `src/app/api/organizations/[id]/join/route.ts`:
+### 4. Analytics System
+Create `src/app/api/organizations/[id]/analytics/route.ts`:
 ```typescript
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../auth/[...nextauth]/route';
-import clientPromise from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+type Props = {
+    params: Promise<{ id: string }>;
+};
 
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
+export async function GET(
+    request: Request,
+    { params }: Props
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return new Response('Unauthorized', { status: 401 });
-  }
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user) {
+            return NextResponse.json(
+                { error: 'Not authenticated' },
+                { status: 401 }
+            );
+        }
 
-  const client = await clientPromise;
-  const db = client.db();
+        const { id } = await params;
+        const organization = await Organization.findOne({
+            _id: new ObjectId(id),
+            $or: [
+                { ownerId: session.user.id },
+                { 'members.discordUserId': session.user.discordId }
+            ]
+        });
 
-  const orgId = new ObjectId(params.id);
-  const org = await db.collection('organizations').findOne({ _id: orgId });
-  
-  if (!org) {
-    return new Response('Organization not found', { status: 404 });
-  }
+        if (!organization) {
+            return NextResponse.json(
+                { error: 'Organization not found or not a member' },
+                { status: 404 }
+            );
+        }
 
-  // Check if already a member
-  const existingMember = await db.collection('organization_members').findOne({
-    organizationId: orgId,
-    userId: session.user.id,
-  });
+        // Calculate analytics
+        const analyticsData: AnalyticsData = {
+            totalMembers: organization.members.length,
+            totalReports: await Report.countDocuments({ organizationId: new ObjectId(id) }),
+            totalProfit: 0,
+            profitByMember: new Map()
+        };
 
-  if (existingMember) {
-    return new Response('Already a member', { status: 400 });
-  }
+        // Initialize profit for all members
+        organization.members.forEach((member: OrganizationMember) => {
+            analyticsData.profitByMember.set(member.discordUserId, 0);
+        });
 
-  // Check for existing request
-  const existingRequest = await db.collection('join_requests').findOne({
-    organizationId: orgId,
-    userId: session.user.id,
-    status: 'pending',
-  });
+        // Calculate profits from reports
+        const reports = await Report.find({ organizationId: new ObjectId(id) });
+        reports.forEach(report => {
+            analyticsData.totalProfit += report.profit;
+            const profitPerParticipant = report.profit / report.participants.length;
+            report.participants.forEach(participantId => {
+                const currentProfit = analyticsData.profitByMember.get(participantId) || 0;
+                analyticsData.profitByMember.set(participantId, currentProfit + profitPerParticipant);
+            });
+        });
 
-  if (existingRequest) {
-    return new Response('Request already pending', { status: 400 });
-  }
+        return NextResponse.json(toAnalyticsResponse(analyticsData));
 
-  // Create join request
-  const request = {
-    organizationId: orgId,
-    userId: session.user.id,
-    requestedAt: new Date(),
-    status: 'pending',
-  };
-
-  await db.collection('join_requests').insertOne(request);
-
-  return new Response(JSON.stringify(request), {
-    status: 201,
-    headers: { 'Content-Type': 'application/json' },
-  });
+    } catch (error) {
+        console.error('Error fetching analytics:', error);
+        return NextResponse.json(
+            { error: 'Failed to fetch analytics' },
+            { status: 500 }
+        );
+    }
 }
 ```
 
 ### 5. Organization Creation UI
-Create `src/app/dashboard/organizations/new/page.tsx`:
+Create `src/components/organizations/CreateOrgForm.tsx`:
 ```typescript
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { getAdminGuilds } from '@/lib/discord';
+import { CreateOrganizationInput } from '@/types/organizations';
 
-export default function NewOrganizationPage() {
-  const { data: session } = useSession({ required: true });
-  const [adminGuilds, setAdminGuilds] = useState([]);
-  const [name, setName] = useState('');
-  const [selectedServer, setSelectedServer] = useState('');
+interface CreateOrgFormProps {
+    onSubmit: (data: CreateOrganizationInput) => Promise<void>;
+}
 
-  useEffect(() => {
-    if (session?.accessToken) {
-      getAdminGuilds(session.accessToken).then(setAdminGuilds);
-    }
-  }, [session]);
+export default function CreateOrgForm({ onSubmit }: CreateOrgFormProps) {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [guilds, setGuilds] = useState<DiscordGuild[]>([]);
+    const [selectedGuild, setSelectedGuild] = useState<string>('');
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    
-    const response = await fetch('/api/organizations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        discordServerId: selectedServer,
-      }),
-    });
+    // Form submission handler
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedGuild || !name) return;
 
-    if (response.ok) {
-      // Redirect to org dashboard
-      const org = await response.json();
-      router.push(`/dashboard/organizations/${org._id}`);
-    }
-  }
+        setLoading(true);
+        setError(null);
 
-  return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Create Organization</h1>
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block mb-2">Organization Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
+        try {
+            await onSubmit({
+                name,
+                description,
+                discordGuildId: selectedGuild,
+                settings: {
+                    profitSharing: {
+                        defaultShare: 100,
+                        method: 'equal'
+                    }
+                }
+            });
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to create organization');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        <div>
-          <label className="block mb-2">Discord Server</label>
-          <select
-            value={selectedServer}
-            onChange={(e) => setSelectedServer(e.target.value)}
-            className="w-full p-2 border rounded"
-            required
-          >
-            <option value="">Select a server...</option>
-            {adminGuilds.map((guild) => (
-              <option key={guild.id} value={guild.id}>
-                {guild.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="submit"
-          className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700"
-        >
-          Create Organization
-        </button>
-      </form>
-    </div>
-  );
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Form fields */}
+        </form>
+    );
 }
 ```
 
-### 6. Join Request UI
-Create `src/app/dashboard/organizations/[id]/join/page.tsx`:
-```typescript
-'use client';
-
-import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-
-export default function JoinOrganizationPage() {
-  const params = useParams();
-  const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  async function handleJoinRequest() {
-    setIsSubmitting(true);
-    
-    try {
-      const response = await fetch(`/api/organizations/${params.id}/join`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        router.push('/dashboard');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto p-6 text-center">
-      <h1 className="text-2xl font-bold mb-6">Join Organization</h1>
-      <p className="mb-4">
-        Request to join this organization. An admin will review your request.
-      </p>
-      <button
-        onClick={handleJoinRequest}
-        disabled={isSubmitting}
-        className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 disabled:opacity-50"
-      >
-        {isSubmitting ? 'Submitting...' : 'Request to Join'}
-      </button>
-    </div>
-  );
-}
-```
-
-### 7. Testing
+### 6. Testing
 1. Create Discord application with required scopes
 2. Set up environment variables
 3. Test organization creation:
    - Sign in as server admin
-   - Create organization
+   - Create organization with profit sharing settings
    - Verify MongoDB entries
-4. Test join requests:
-   - Sign in as regular user
-   - Submit join request
-   - Verify request in database
+4. Test analytics:
+   - Create test reports
+   - Verify profit calculations
+   - Check member profit distribution
 
 ### Next Steps
 1. Implement request approval/rejection UI
 2. Add role management
 3. Set up member permissions system
 4. Create organization settings page
+5. Add profit sharing configuration UI

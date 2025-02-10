@@ -10,22 +10,22 @@ export async function GET(
 
         // Get all commodities and filter by query
         const commodities = await scraper.getCommodities();
-        const filteredCommodities = commodities.filter(code => 
-            code.toLowerCase().includes(query)
-        );
+        const filteredCommodities = commodities.filter(commodity => (
+            commodity.code.toLowerCase().includes(query) ||
+            commodity.name.toLowerCase().includes(query)
+        ));
 
         // Get detailed data for top 5 matches
         const results = await Promise.all(
-            filteredCommodities.slice(0, 5).map(async code => {
-                const data = await scraper.getCommodityPrices(code);
+            filteredCommodities.slice(0, 5).map(async commodity => {
+                const data = await scraper.getCommodityPrices(commodity.code);
                 const bestLocation = data.bestSellLocation;
 
                 return {
-                    code: data.code,
-                    name: data.commodity,
-                    shortName: data.code.toUpperCase(),
+                    code: commodity.code,
+                    name: commodity.name,
                     location: bestLocation?.name || 'Unknown',
-                    currentPrice: bestLocation?.price || 0
+                    currentPrice: bestLocation?.price || 0,
                 };
             })
         );

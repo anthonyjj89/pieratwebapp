@@ -4,7 +4,7 @@ import { ObjectId } from 'mongodb';
 import dbConnect from '@/lib/db';
 import { Organization } from '@/models/organization';
 import { authOptions } from '@/lib/auth';
-import { OrganizationMember, toClientOrganization } from '@/types/organizations';
+import { OrganizationMember, toClientOrganization, CreateOrganizationInput } from '@/types/organizations';
 
 export async function GET() {
     try {
@@ -50,8 +50,8 @@ export async function POST(request: Request) {
             );
         }
 
-        const body = await request.json();
-        const { name, discordGuildId } = body;
+        const input: CreateOrganizationInput = await request.json();
+        const { name, discordGuildId, roles } = input;
 
         if (!name || !discordGuildId) {
             return NextResponse.json(
@@ -86,6 +86,11 @@ export async function POST(request: Request) {
             discordGuildId,
             ownerId: session.user.id,
             members: [ownerMember],
+            roles: roles || { // Use provided roles or default to empty object
+                'owner': {
+                    ratio: 1.0
+                }
+            },
             settings: {
                 profitSharing: {
                     defaultShare: 100,

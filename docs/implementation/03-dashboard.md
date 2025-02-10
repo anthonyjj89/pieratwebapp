@@ -1,7 +1,7 @@
 # Dashboard Implementation Guide
 
 ## Overview
-This guide details the implementation of the dashboard interface and core features including hit reporting, crew management, and profit tracking.
+This guide details the implementation of the dashboard interface and core features including hit reporting, crew management, analytics, and profit tracking.
 
 ## Prerequisites
 - Authentication system from [01-auth-setup.md](./01-auth-setup.md)
@@ -34,100 +34,210 @@ export default function DashboardLayout({
 }
 ```
 
-### 2. Navigation Components
-Create `src/components/dashboard/Sidebar.tsx`:
+### 2. Analytics Types
+Create `src/types/analytics.ts`:
+```typescript
+export interface MemberProfit {
+    memberId: string;
+    profit: number;
+}
+
+export interface AnalyticsResponse {
+    totalMembers: number;
+    totalReports: number;
+    totalProfit: number;
+    profitByMember: MemberProfit[];
+}
+
+export interface AnalyticsData {
+    totalMembers: number;
+    totalReports: number;
+    totalProfit: number;
+    profitByMember: Map<string, number>;
+}
+
+export function calculateProfitByMember(profitMap: Map<string, number>): MemberProfit[] {
+    return Array.from(profitMap.entries())
+        .map(([memberId, profit]) => ({
+            memberId,
+            profit: Math.round(profit)
+        }))
+        .sort((a, b) => b.profit - a.profit);
+}
+
+export function toAnalyticsResponse(data: AnalyticsData): AnalyticsResponse {
+    return {
+        totalMembers: data.totalMembers,
+        totalReports: data.totalReports,
+        totalProfit: Math.round(data.totalProfit),
+        profitByMember: calculateProfitByMember(data.profitByMember)
+    };
+}
+```
+
+### 3. Analytics Hook
+Create `src/hooks/useOrganizationAnalytics.ts`:
+```typescript
+import { useEffect, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { AnalyticsResponse } from '@/types/analytics';
+
+interface UseOrganizationAnalyticsResult {
+    analytics: AnalyticsResponse | null;
+    isLoading: boolean;
+    error: string | null;
+    mutate: () => Promise<void>;
+}
+
+export function useOrganizationAnalytics(organizationId: string | null): UseOrganizationAnalyticsResult {
+    const { data: session } = useSession();
+    const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchAnalytics = useCallback(async () => {
+        if (!organizationId) return;
+
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const response = await fetch(`/api/organizations/${organizationId}/analytics`);
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to fetch analytics');
+            }
+
+            const data = await response.json();
+            setAnalytics(data);
+        } catch (err) {
+            console.error('Error fetching analytics:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+            setAnalytics(null);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [organizationId]);
+
+    useEffect(() => {
+        if (session?.user && organizationId) {
+            fetchAnalytics();
+        } else {
+            setAnalytics(null);
+            setIsLoading(false);
+        }
+    }, [session, organizationId, fetchAnalytics]);
+
+    return {
+        analytics,
+        isLoading,
+        error,
+        mutate: fetchAnalytics
+    };
+}
+```
+
+### 4. Analytics Dashboard
+Create `src/app/(dashboard)/analytics/page.tsx`:
 ```typescript
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { cn } from '@/lib/utils';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useOrganizationAnalytics } from '@/hooks/useOrganizationAnalytics';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-const navigation = [
-  { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-  { name: 'Reports', href: '/dashboard/reports', icon: DocumentIcon },
-  { name: 'Crew', href: '/dashboard/crew', icon: UsersIcon },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: ChartIcon },
-  { name: 'Settings', href: '/dashboard/settings', icon: CogIcon },
-];
+export default function AnalyticsPage() {
+    const router = useRouter();
+    const { organization, isLoading: isLoadingOrg } = useCurrentOrganization();
+    const { analytics, isLoading: isLoadingAnalytics, error } = useOrganizationAnalytics(
+        organization?.id ?? null
+    );
 
-export function Sidebar() {
-  const pathname = usePathname();
-  const { data: session } = useSession();
+    useEffect(() => {
+        if (!isLoadingOrg && !organization) {
+            router.push('/setup');
+        }
+    }, [organization, isLoadingOrg, router]);
 
-  return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex flex-col flex-grow bg-gray-900 pt-5 pb-4">
-        <div className="flex items-center flex-shrink-0 px-4">
-          <span className="text-xl font-bold text-white">PieRat</span>
+    if (isLoadingOrg || isLoadingAnalytics) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <p className="text-lg">Loading analytics...</p>
+            </div>
+        );
+    }
+
+    if (!organization) {
+        return null; // Will redirect in useEffect
+    }
+
+    if (error) {
+        return (
+            <div className="container mx-auto px-4 py-8">
+                <div className="p-4 bg-red-500/10 border border-red-500 rounded">
+                    <p className="text-red-400">{error}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!analytics) {
+        return (
+            <div className="container mx-auto px-4 py-8">
+                <div className="text-center p-12 bg-black/20 backdrop-blur-sm rounded">
+                    <p className="text-lg opacity-75">
+                        No analytics data available. Create some reports to get started.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-8">Analytics</h1>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <div className="p-6 bg-black/20 backdrop-blur-sm rounded border border-white/10">
+                    <h3 className="text-lg font-medium mb-2">Total Members</h3>
+                    <p className="text-3xl font-bold">{analytics.totalMembers}</p>
+                </div>
+
+                <div className="p-6 bg-black/20 backdrop-blur-sm rounded border border-white/10">
+                    <h3 className="text-lg font-medium mb-2">Total Reports</h3>
+                    <p className="text-3xl font-bold">{analytics.totalReports}</p>
+                </div>
+
+                <div className="p-6 bg-black/20 backdrop-blur-sm rounded border border-white/10">
+                    <h3 className="text-lg font-medium mb-2">Total Profit</h3>
+                    <p className="text-3xl font-bold">
+                        {analytics.totalProfit.toLocaleString()} aUEC
+                    </p>
+                </div>
+            </div>
+
+            <div className="bg-black/20 backdrop-blur-sm rounded border border-white/10 p-6">
+                <h2 className="text-xl font-semibold mb-6">Profit by Member</h2>
+                <div className="space-y-4">
+                    {analytics.profitByMember.map((member) => (
+                        <div
+                            key={member.memberId}
+                            className="flex justify-between items-center"
+                        >
+                            <span>{member.memberId}</span>
+                            <span>{member.profit.toLocaleString()} aUEC</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
-        <nav className="mt-5 flex-1 flex flex-col divide-y divide-gray-800 overflow-y-auto">
-          <div className="px-2 space-y-1">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  pathname === item.href
-                    ? 'bg-gray-800 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800',
-                  'group flex items-center px-2 py-2 text-sm font-medium rounded-md'
-                )}
-              >
-                <item.icon
-                  className="mr-3 flex-shrink-0 h-6 w-6"
-                  aria-hidden="true"
-                />
-                {item.name}
-              </Link>
-            ))}
-          </div>
-        </nav>
-      </div>
-    </div>
-  );
+    );
 }
 ```
 
-### 3. Hit Report System
-Create `src/models/Report.ts`:
-```typescript
-import { ObjectId } from 'mongodb';
-
-export interface Report {
-  _id: ObjectId;
-  organizationId: ObjectId;
-  createdBy: string; // Discord user ID
-  createdAt: Date;
-  updatedAt: Date;
-  status: 'draft' | 'submitted' | 'verified' | 'completed';
-  target: {
-    name: string;
-    ship: string;
-    location: string;
-  };
-  crew: Array<{
-    userId: string;
-    role: string;
-    share: number;
-  }>;
-  loot: Array<{
-    type: string;
-    amount: number;
-    value: number;
-  }>;
-  evidence: Array<{
-    type: 'image' | 'video';
-    url: string;
-    description: string;
-  }>;
-  notes: string;
-}
-```
-
-### 4. Report Creation Form
-Create `src/app/dashboard/reports/new/page.tsx`:
+### 5. Report Creation Form
+Create `src/components/reports/HitReportForm.tsx`:
 ```typescript
 'use client';
 
@@ -135,291 +245,58 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
-export default function NewReportPage() {
-  const router = useRouter();
-  const { data: session } = useSession({ required: true });
-  const [formData, setFormData] = useState({
-    target: {
-      name: '',
-      ship: '',
-      location: '',
-    },
-    crew: [],
-    loot: [],
-    notes: '',
-  });
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    
-    const response = await fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
+export default function HitReportForm() {
+    const router = useRouter();
+    const { data: session } = useSession({ required: true });
+    const [formData, setFormData] = useState({
+        target: {
+            name: '',
+            ship: '',
+            location: '',
+        },
+        crew: [],
+        loot: [],
+        notes: '',
     });
 
-    if (response.ok) {
-      const report = await response.json();
-      router.push(`/dashboard/reports/${report._id}`);
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        
+        const response = await fetch('/api/reports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData),
+        });
+
+        if (response.ok) {
+            const report = await response.json();
+            router.push(`/dashboard/reports/${report._id}`);
+        }
     }
-  }
 
-  return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">New Hit Report</h1>
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Target Information */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium mb-4">Target Information</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Target Name
-              </label>
-              <input
-                type="text"
-                value={formData.target.name}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    target: { ...formData.target, name: e.target.value },
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                required
-              />
-            </div>
-            {/* Add other target fields */}
-          </div>
-        </div>
-
-        {/* Crew Section */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium mb-4">Crew</h2>
-          {/* Add crew member UI */}
-        </div>
-
-        {/* Loot Section */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium mb-4">Loot</h2>
-          {/* Add loot items UI */}
-        </div>
-
-        {/* Notes */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium mb-4">Notes</h2>
-          <textarea
-            value={formData.notes}
-            onChange={(e) =>
-              setFormData({ ...formData, notes: e.target.value })
-            }
-            rows={4}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-          />
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-          >
-            Submit Report
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Form fields */}
+        </form>
+    );
 }
 ```
 
-### 5. Report List View
-Create `src/app/dashboard/reports/page.tsx`:
-```typescript
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import clientPromise from '@/lib/mongodb';
-import Link from 'next/link';
-
-export default async function ReportsPage() {
-  const session = await getServerSession(authOptions);
-  const client = await clientPromise;
-  const db = client.db();
-
-  // Get user's organization
-  const member = await db.collection('organization_members').findOne({
-    userId: session.user.id,
-    status: 'active',
-  });
-
-  // Get reports for the organization
-  const reports = await db
-    .collection('reports')
-    .find({ organizationId: member.organizationId })
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .toArray();
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Hit Reports</h1>
-        <Link
-          href="/dashboard/reports/new"
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          New Report
-        </Link>
-      </div>
-
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <ul role="list" className="divide-y divide-gray-200">
-          {reports.map((report) => (
-            <li key={report._id.toString()}>
-              <Link
-                href={`/dashboard/reports/${report._id}`}
-                className="block hover:bg-gray-50"
-              >
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <p className="text-sm font-medium text-indigo-600 truncate">
-                        {report.target.name}
-                      </p>
-                      <div className="ml-2 flex-shrink-0 flex">
-                        <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {report.status}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="ml-2 flex-shrink-0 flex">
-                      <p className="text-sm text-gray-500">
-                        {new Date(report.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-```
-
-### 6. Analytics Dashboard
-Create `src/app/dashboard/analytics/page.tsx`:
-```typescript
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import clientPromise from '@/lib/mongodb';
-
-export default async function AnalyticsPage() {
-  const session = await getServerSession(authOptions);
-  const client = await clientPromise;
-  const db = client.db();
-
-  // Get user's organization
-  const member = await db.collection('organization_members').findOne({
-    userId: session.user.id,
-    status: 'active',
-  });
-
-  // Get analytics data
-  const totalReports = await db
-    .collection('reports')
-    .countDocuments({ organizationId: member.organizationId });
-
-  const recentReports = await db
-    .collection('reports')
-    .find({ organizationId: member.organizationId })
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .toArray();
-
-  const totalLoot = await db
-    .collection('reports')
-    .aggregate([
-      { $match: { organizationId: member.organizationId } },
-      { $unwind: '$loot' },
-      { $group: { _id: null, total: { $sum: '$loot.value' } } },
-    ])
-    .toArray();
-
-  return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Analytics</h1>
-
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Stats Cards */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <DocumentIcon className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Reports
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {totalReports}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CurrencyIcon className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Loot Value
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {totalLoot[0]?.total.toLocaleString()} aUEC
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900">Recent Activity</h2>
-        <div className="mt-4 bg-white shadow overflow-hidden sm:rounded-lg">
-          {/* Add recent activity list */}
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
-### 7. Testing
+### 6. Testing
 1. Test dashboard navigation:
    - All routes accessible
    - Proper active state highlighting
    - Mobile responsiveness
-2. Test report creation:
-   - Form validation
-   - File uploads
-   - Success/error handling
-3. Test analytics:
+2. Test analytics:
    - Data accuracy
-   - Performance with large datasets
-   - Chart interactions
+   - Profit calculations
+   - Member profit distribution
+   - Loading states
+   - Error handling
+3. Test report creation:
+   - Form validation
+   - Success/error handling
+   - Profit updates in analytics
 
 ### Next Steps
 1. Add report approval workflow
@@ -427,3 +304,4 @@ export default async function AnalyticsPage() {
 3. Add real-time updates
 4. Enhance analytics with charts
 5. Add export functionality
+6. Add profit sharing configuration UI

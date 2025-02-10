@@ -10,7 +10,6 @@ interface CargoLookupProps {
 interface Commodity {
     code: string;
     name: string;
-    shortName: string;
     location: string;
     currentPrice: number;
 }
@@ -83,7 +82,7 @@ export default function CargoLookup({ onSelect }: CargoLookupProps) {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => handleSearch(e.target.value)}
-                    placeholder="Search by name (e.g. Recycled Material Composite) or short name (e.g. RMC)"
+                    placeholder="Search by name (e.g. Recycled Material Composite)"
                     className="w-full px-3 py-2 bg-black/20 backdrop-blur-sm border rounded"
                 />
             </div>
@@ -106,7 +105,6 @@ export default function CargoLookup({ onSelect }: CargoLookupProps) {
                         >
                             <div>
                                 <div className="font-medium">{commodity.name}</div>
-                                <div className="text-sm opacity-75">{commodity.shortName}</div>
                             </div>
                             <div className="text-right">
                                 <div>{commodity.currentPrice.toLocaleString()} aUEC</div>

@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 export interface OrganizationMember {
     userId: string; // For backward compatibility
     discordUserId: string;
-    role: 'owner' | 'admin' | 'member';
+    role: string; // Use custom roles defined by the organization
     joinedAt: Date;
     settings?: {
         profitShare?: number;
@@ -18,6 +18,11 @@ export interface Organization {
     discordGuildId: string;
     ownerId: string;
     members: OrganizationMember[];
+    roles: { // Define custom roles with profit sharing ratios
+        [roleName: string]: {
+            ratio: number;
+        };
+    };
     settings: {
         profitSharing: {
             defaultShare: number;
@@ -32,6 +37,11 @@ export interface CreateOrganizationInput {
     name: string;
     description?: string;
     discordGuildId: string;
+    roles: { // Define custom roles with profit sharing ratios
+        [roleName: string]: {
+            ratio: number;
+        };
+    };
     settings: {
         profitSharing: {
             defaultShare: number;
