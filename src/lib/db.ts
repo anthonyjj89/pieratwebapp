@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 declare global {
     // eslint-disable-next-line no-var
-    var mongoose: {
+    var mongooseDb: {
         conn: mongoose.Connection | null;
         promise: Promise<mongoose.Connection> | null;
     } | undefined;
@@ -19,10 +19,10 @@ interface CachedConnection {
     promise: Promise<mongoose.Connection> | null;
 }
 
-const cached: CachedConnection = global.mongoose || { conn: null, promise: null };
+const cached: CachedConnection = global.mongooseDb || { conn: null, promise: null };
 
-if (!global.mongoose) {
-    global.mongoose = cached;
+if (!global.mongooseDb) {
+    global.mongooseDb = cached;
 }
 
 async function dbConnect(): Promise<mongoose.Connection> {

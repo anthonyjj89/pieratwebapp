@@ -61,12 +61,35 @@ export interface JoinRequestStatus {
     message?: string;
 }
 
+// MongoDB document type
+export interface MongoOrganization extends Omit<Organization, 'id' | 'roles'> {
+    _id: ObjectId;
+    roles: Map<string, { ratio: number }> | { [key: string]: { ratio: number } };
+}
+
 // Helper function to convert MongoDB document to client-safe object
-export function toClientOrganization(org: Organization): Omit<Organization, '_id'> & { id: string } {
-    const { _id, ...rest } = org;
+export function toClientOrganization(org: MongoOrganization): Omit<Organization, '_id'> & { id: string } {
+    const { _id, roles, members, ...rest } = org;
+
+    // Convert Map to plain object for roles
+    const rolesObj = roles instanceof Map ? 
+        Object.fromEntries(roles) : 
+        (typeof roles === 'object' ? roles : {});
+
+    // Ensure members have userId set for backward compatibility
+    const processedMembers = members?.map((member: OrganizationMember) => ({
+        ...member,
+        userId: member.userId || member.discordUserId,
+        role: member.role || 'member',
+        joinedAt: member.joinedAt || new Date(),
+        settings: member.settings || {}
+    })) || [];
+
     return {
         ...rest,
-        id: _id.toString()
+        id: _id.toString(),
+        roles: rolesObj,
+        members: processedMembers
     };
 }
 

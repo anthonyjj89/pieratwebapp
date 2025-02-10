@@ -25,6 +25,38 @@ const organizationSchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    members: [{
+        userId: String, // For backward compatibility
+        discordUserId: {
+            type: String,
+            required: true
+        },
+        role: {
+            type: String,
+            required: true
+        },
+        joinedAt: {
+            type: Date,
+            default: Date.now
+        },
+        settings: {
+            profitShare: {
+                type: Number,
+                min: 0,
+                max: 100
+            }
+        }
+    }],
+    roles: {
+        type: Map,
+        of: {
+            ratio: {
+                type: Number,
+                required: true
+            }
+        },
+        default: {}
+    },
     settings: {
         profitSharing: {
             defaultShare: {
