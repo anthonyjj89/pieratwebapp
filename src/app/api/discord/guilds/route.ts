@@ -15,13 +15,26 @@ const DISCORD_API = 'https://discord.com/api/v10';
 
 export async function GET() {
     try {
+        console.log('Fetching Discord guilds...');
         const session = await getServerSession(authOptions);
-        if (!session?.accessToken) {
+        
+        if (!session) {
+            console.log('No session found');
             return NextResponse.json(
-                { error: 'Not authenticated' },
+                { error: 'Not authenticated - No session' },
                 { status: 401 }
             );
         }
+
+        if (!session.accessToken) {
+            console.log('No access token in session:', session);
+            return NextResponse.json(
+                { error: 'Not authenticated - No access token' },
+                { status: 401 }
+            );
+        }
+
+        console.log('Fetching guilds with token:', session.accessToken.slice(0, 10) + '...');
 
         // Fetch user's guilds from Discord API
         const response = await fetch(`${DISCORD_API}/users/@me/guilds`, {
@@ -31,7 +44,13 @@ export async function GET() {
         });
 
         if (!response.ok) {
-            throw new Error(`Discord API error: ${response.statusText}`);
+            const errorText = await response.text();
+            console.error('Discord API error:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorText
+            });
+            throw new Error(`Discord API error: ${response.status} - ${errorText}`);
         }
 
         const guilds: DiscordGuild[] = await response.json();

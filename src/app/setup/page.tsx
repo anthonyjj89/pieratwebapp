@@ -22,12 +22,19 @@ export default function SetupPage() {
     // Load available Discord servers
     useEffect(() => {
         const loadServers = async () => {
-            if (!session?.discordGuilds) return;
+            if (!session?.discordGuilds) {
+                console.log('No discord guilds in session:', session);
+                setError('No Discord servers found in session');
+                setLoading(false);
+                return;
+            }
 
             try {
+                console.log('Loading servers for guilds:', session.discordGuilds.length);
                 // Check each guild against our database
                 const results = await Promise.all(
                     session.discordGuilds.map(async (guild: DiscordGuild) => {
+                        console.log('Checking guild:', guild.id);
                         const response = await fetch(`/api/organizations/check/${guild.id}`);
                         const data = await response.json();
 
@@ -49,9 +56,11 @@ export default function SetupPage() {
                     })
                 );
 
+                console.log('Processed servers:', results);
                 setServers(results);
             } catch (err) {
-                setError('Failed to load servers');
+                const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+                setError(`Failed to load servers: ${errorMessage}`);
                 console.error('Error loading servers:', err);
             } finally {
                 setLoading(false);
@@ -110,8 +119,20 @@ export default function SetupPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <p className="text-lg">Loading servers...</p>
+            <div className="flex flex-col items-center justify-center min-h-screen">
+                <p className="text-lg mb-4">Loading servers...</p>
+                {error && (
+                    <div className="text-red-400 text-sm">
+                        Error: {error}
+                    </div>
+                )}
+                <div className="text-sm opacity-50 mt-4">
+                    Session Status: {session ? 'Active' : 'None'}
+                    <br />
+                    Guilds Count: {session?.discordGuilds?.length || 0}
+                    <br />
+                    Access Token: {session?.accessToken ? '✓ Present' : '✗ Missing'}
+                </div>
             </div>
         );
     }
@@ -184,6 +205,13 @@ export default function SetupPage() {
                             <p className="text-lg opacity-75">
                                 No Discord servers found. Make sure you have admin permissions in at least one server.
                             </p>
+                            <div className="text-sm opacity-50 mt-4">
+                                Session Status: {session ? 'Active' : 'None'}
+                                <br />
+                                Guilds Count: {session?.discordGuilds?.length || 0}
+                                <br />
+                                Access Token: {session?.accessToken ? '✓ Present' : '✗ Missing'}
+                            </div>
                         </div>
                     )}
                 </div>
